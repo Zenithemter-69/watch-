@@ -617,10 +617,10 @@ setInterval(() => {
   const raw = expectedMs() - vid.currentTime*1000;               // + = we are behind
   driftF = driftF == null ? raw : driftF + 0.3*(raw - driftF);
   const a = Math.abs(driftF), now = performance.now();
-  if (a > 250){
-    if (now - lastSeekAt > 3000){ lastSeekAt = now; prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; }); driftF = null; }
-  } else if (a >= 40){
-    vid.playbackRate = tl.rate + Math.max(-0.02, Math.min(0.02, driftF/5000));
+  if (a > 1200){
+    if (now - lastSeekAt > 8000){ lastSeekAt = now; prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; }); driftF = null; }
+  } else if (a >= 300){
+    vid.playbackRate = tl.rate + Math.max(-0.01, Math.min(0.01, driftF/8000));
   } else if (Math.abs(vid.playbackRate - tl.rate) > 0.0005){
     vid.playbackRate = tl.rate;
   }
