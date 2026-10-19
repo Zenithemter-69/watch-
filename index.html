@@ -49,6 +49,21 @@
   .tm{font-size:12px;font-variant-numeric:tabular-nums;color:#ddd;min-width:44px;text-align:center}
   #pop{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:#2a2a2eEE;padding:8px 16px;border-radius:20px;font-size:13px;display:none;max-width:90%;text-align:center;z-index:9}
   #status{position:absolute;bottom:92px;left:0;right:0;text-align:center;font-size:12px;color:#ddd;pointer-events:none}
+  select{padding:13px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:15px;flex:1}
+  #viewer{position:fixed;inset:0;background:#000;display:none;z-index:6}
+  #viewer.on{display:block}
+  #rv{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  #vbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;background:linear-gradient(#000a,#0000)}
+  #vbar .t{flex:1;font-size:13px}
+  #tap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:18px 28px;display:none;font-size:18px}
+  #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10ee;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
+  #chat.on{display:flex}
+  #chatHead{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
+  #chatLog{flex:1;overflow-y:auto;padding:6px 12px;-webkit-overflow-scrolling:touch}
+  .cm{margin-bottom:8px;font-size:14px;line-height:1.35;word-wrap:break-word;overflow-wrap:anywhere}
+  .cm b{color:var(--accent)}
+  #chatForm{display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  #chatIn{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:16px}
   #lpop{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2a2a2e;padding:8px 16px;border-radius:20px;font-size:13px;display:none;z-index:9}
 </style>
 </head>
@@ -64,7 +79,14 @@
     <label>Your nickname</label>
     <input id="nick" type="text" maxlength="20" placeholder="e.g. Nis" autocomplete="off">
   </div>
-  <div class="card"><button id="create">Create room</button></div>
+  <div class="card">
+    <button id="create">Create room</button>
+    <div class="who">Everyone picks the same movie file on their own phone. Works well with weak internet.</div>
+  </div>
+  <div class="card">
+    <button id="createStream" class="sec">📡 Create stream room</button>
+    <div class="who">You play the movie and the other phone watches it live. They don't need the file. Needs good upload speed on your phone (use Chrome on Android).</div>
+  </div>
   <div class="card">
     <label>Or join with a 6-digit code</label>
     <div class="row">
@@ -82,6 +104,7 @@
     <label>Room code</label>
     <div class="code" id="roomCode">------</div>
     <button class="sec" id="invite">Share invite</button>
+    <button class="sec" id="chatBtnL" style="margin-top:8px">💬 Chat</button>
   </div>
 
   <div class="card">
@@ -100,6 +123,25 @@
     <div class="who" id="fileHint"></div>
   </div>
 
+  <div class="card" id="streamCard" style="display:none">
+    <label>📡 Live streaming (the other phone does not need the movie file)</label>
+    <div id="streamHost" style="display:none">
+      <div class="row">
+        <select id="qual">
+          <option value="low">Low (weak internet)</option>
+          <option value="med" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <button id="streamBtn" class="sec" style="flex:1.2">Start streaming</button>
+      </div>
+      <div class="who" id="streamInfo"></div>
+    </div>
+    <div id="streamGuest" style="display:none">
+      <button id="watchBtn">📡 Watch live stream</button>
+      <div class="who">The host's phone sends the movie to you. No file needed.</div>
+    </div>
+  </div>
+
   <div class="msg" id="roomMsg"></div>
   <div class="card"><button id="main" disabled>Start</button></div>
   <button class="red" id="leave">Leave room</button>
@@ -115,6 +157,7 @@
     <div class="top">
       <button class="chip sec" id="back">‹ Back</button>
       <div class="t" id="title"></div>
+      <button class="chip sec" id="chatBtnP">💬</button>
       <div class="chip" id="ppl">👥 1</div>
     </div>
     <div class="mid">
@@ -128,6 +171,29 @@
       <div class="tm" id="tDur">0:00</div>
       <button class="chip sec" id="fs">⛶</button>
     </div>
+  </div>
+</div>
+
+<!-- CHAT (slides in from the right, over any screen) -->
+<div id="chat">
+  <div id="chatHead"><b>💬 Chat</b><button class="chip sec" id="chatClose">✕</button></div>
+  <div id="chatLog"></div>
+  <form id="chatForm" autocomplete="off">
+    <input id="chatIn" type="text" maxlength="300" placeholder="Type a message…" enterkeyhint="send">
+    <button type="submit" style="width:auto;padding:12px 16px">Send</button>
+  </form>
+</div>
+
+<!-- STREAM VIEWER -->
+<div id="viewer">
+  <video id="rv" playsinline webkit-playsinline autoplay></video>
+  <button id="tap">▶ Tap to play</button>
+  <div id="vbar">
+    <button class="chip sec" id="vback">‹ Back</button>
+    <div class="t" id="vstatus">Connecting…</div>
+    <button class="chip sec" id="chatBtnV">💬</button>
+    <button class="chip sec" id="vretry">↻</button>
+    <button class="chip sec" id="vfs">⛶</button>
   </div>
 </div>
 
@@ -199,8 +265,9 @@ function startClock(){
 }
 
 /* ================= create / join ================= */
-async function createRoom(){
+async function createRoom(mode){
   saveNick(); if (!nick) return err("Type a nickname first");
+  if (mode === "stream" && !(vid.captureStream || vid.mozCaptureStream)) return err("Streaming needs Chrome on Android. On this browser, join a room instead.");
   err("Creating room…");
   try{
     let c = "";
@@ -211,7 +278,7 @@ async function createRoom(){
     if (!c) throw new Error("no free room code");
     const id = newId();
     const r = await fetch(url(`rooms/${c}`), {method:"PUT", body: JSON.stringify({
-      hostId:id, createdAt:SV,
+      hostId:id, mode:(mode === "stream" ? "stream" : "sync"), createdAt:SV,
       timeline:{state:"stopped",pos:0,rate:1.0,startAt:0,seq:0},
       people:{[id]:{name:nick,verified:false,ready:false,seen:SV}}
     })});
@@ -234,7 +301,7 @@ async function joinRoom(){
   }catch(e){ err("Could not join: "+e.message); }
 }
 function enterRoom(c, id){
-  err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null;
+  err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null; gotData = false;
   tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
   controlAll = false; controllers = new Set();
   history.replaceState(null, "", "#"+c);
@@ -247,6 +314,10 @@ function enterRoom(c, id){
 }
 function cleanup(msg){
   if (es) es.close(); es = null;
+  closeHostPeers(); closeViewerPeer(); capStream = null; streamWanted = false;
+  $("viewer").classList.remove("on"); keepAwake(false);
+  autoStreamKey = null; chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false;
+  $("chat").classList.remove("on"); $("chatLog").innerHTML = ""; setBadge();
   timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
   clearInterval(cdTimer);
   vid.pause(); inPlayer = false; $("player").classList.remove("on");
@@ -260,6 +331,7 @@ function leaveRoom(){
     if (isHost()) write("DELETE", `rooms/${code}`);
     else write("DELETE", `rooms/${code}/people/${myId}`);
   }
+  if (code && myId && !isHost()) write("DELETE", `rooms/${code}/rtc/${myId}`);
   cleanup("");
 }
 function heartbeat(){
@@ -280,6 +352,7 @@ function openStream(){
   es.addEventListener("cancel", () => cleanup("No access - check your Firebase rules"));
 }
 function setAt(path, val){
+  gotData = true;
   const segs = path.split("/").filter(Boolean);
   if (!segs.length){ room = (val && typeof val === "object") ? val : {}; return; }
   let o = room;
@@ -292,9 +365,10 @@ function setAt(path, val){
 }
 
 /* ================= room changed ================= */
-let people = [], knownP = {}, knownInit = false;
+let people = [], knownP = {}, knownInit = false, gotData = false;
 function onRoom(){
   if (!code) return;
+  if (!gotData) return;                       // room data has not arrived yet
   if (!room.hostId) return cleanup("Host closed the room");
   const now = nowSrv();
 
@@ -304,7 +378,7 @@ function onRoom(){
     if (!p || !p.name) continue;
     const seen = p.seen || 0;
     const online = now == null || !seen || now - seen < ONLINE_WINDOW;
-    list.push({id, name:p.name, host:id === room.hostId, online, verified:!!p.verified, ready:!!p.ready, match:p.match||1, diff:p.diff||0});
+    list.push({id, name:p.name, host:id === room.hostId, online, verified:!!p.verified, ready:!!p.ready, match:p.match||1, diff:p.diff||0, via:!!p.viaStream});
   }
   list.sort((a,b)=> (b.host-a.host) || a.name.localeCompare(b.name));
   if (!list.some(p => p.id === myId)) return cleanup("You were removed from the room");
@@ -339,6 +413,8 @@ function onRoom(){
     }
   }
   ensureVerified();
+  processStream();
+  chatUpdate();
   renderLobby();
 }
 
@@ -348,6 +424,7 @@ $("file").addEventListener("change", e => {
   if (fileUrl) URL.revokeObjectURL(fileUrl);
   fileUrl = URL.createObjectURL(f);
   fileLabel = f.name; fileMeta = null; sentKey = null;
+  closeHostPeers(); capStream = null;
   $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   $("fileHint").textContent = isIOS && /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? "⚠ iPhone can't play this format. Use an .mp4 / .mov (H.264)." : "Reading movie length…";
@@ -388,6 +465,8 @@ function ensureVerified(){
 /* ================= lobby UI ================= */
 function personStatus(p){
   if (!p.online) return "Offline";
+  if (p.via) return "Watching the live stream";
+  if (room.mode === "stream") return p.host ? "Streaming host" : "In the room";
   const suffix = !p.verified ? "" : p.match === 2 ? " · different file, same length" : p.match === 3 ? " · ⚠ length differs" : "";
   if (started()) return "Watching" + suffix;
   if (p.ready) return "Ready" + suffix;
@@ -439,9 +518,10 @@ function renderLobby(){
     b.disabled = !fileMeta || !mv || !started();
   }
   $("ppl").textContent = "👥 " + online.length;
+  renderStreamCard();
 }
 $("main").onclick = () => {
-  if (isHost() && !started()){ sendCmd("play", 0); }
+  if (isHost() && !started() && room.mode !== "stream"){ sendCmd("play", 0); }
   openPlayer();
 };
 
@@ -587,8 +667,270 @@ $("fs").onclick = () => {
 };
 $("back").onclick = closePlayer;
 
+/* ================= live streaming (WebRTC, signalling through Firebase at rooms/<code>/rtc) =================
+   Host (needs Chrome on Android): vid.captureStream() -> one RTCPeerConnection per viewer.
+   Viewer (any browser, incl. iPhone Safari): just plays the incoming stream, no movie file needed.
+   NOTE: direct phone-to-phone connections fail on some mobile networks. If that happens, add a TURN server below. */
+const ICE = {iceServers:[{urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}
+  /* , {urls:"turn:YOUR_TURN_HOST:3478", username:"USER", credential:"PASS"} */ ]};
+const QUAL = {low:{bps:500000, scale:2}, med:{bps:1200000, scale:1.5}, high:{bps:3000000, scale:1}};
+let hostPeers = {}, capStream = null, lastQ = null;
+let vp = null, streamWanted = false, wakeLock = null;
+
+async function keepAwake(on){
+  try{
+    if (on && navigator.wakeLock && !wakeLock){ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", ()=>wakeLock=null); }
+    else if (!on && wakeLock){ await wakeLock.release(); wakeLock = null; }
+  }catch(e){}
+}
+const canCapture = () => !!(vid.captureStream || vid.mozCaptureStream);
+function getCapStream(){
+  if (capStream && capStream.getTracks().length) return capStream;
+  capStream = vid.captureStream ? vid.captureStream() : (vid.mozCaptureStream ? vid.mozCaptureStream() : null);
+  return capStream;
+}
+function candJson(c){ return {c:c.candidate, m:c.sdpMid, i:c.sdpMLineIndex}; }
+function feedCandidates(peer, obj){
+  if (!obj || !peer || !peer.pc) return;
+  for (const [k,c] of Object.entries(obj)){
+    if (!c || peer.seen.has(k)) continue; peer.seen.add(k);
+    const cand = {candidate:c.c, sdpMid:c.m, sdpMLineIndex:c.i};
+    if (peer.remoteSet) peer.pc.addIceCandidate(cand).catch(()=>{}); else peer.q.push(cand);
+  }
+}
+function flushCandidates(peer){ peer.q.splice(0).forEach(c => peer.pc.addIceCandidate(c).catch(()=>{})); }
+
+/* ---- host side ---- */
+function applyQuality(pc){
+  const q = QUAL[(room.stream && room.stream.q) || "med"] || QUAL.med;
+  pc.getSenders().forEach(s => {
+    if (!s.track || s.track.kind !== "video") return;
+    try{
+      const p = s.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = q.bps;
+      p.encodings[0].scaleResolutionDownBy = q.scale;
+      p.degradationPreference = "maintain-framerate";
+      s.setParameters(p).catch(()=>{});
+    }catch(e){}
+  });
+}
+function closeHostPeers(){
+  Object.values(hostPeers).forEach(h => { try{ h.pc && h.pc.close(); }catch(e){} });
+  hostPeers = {};
+}
+async function startHostPeer(viewerId, want){
+  const old = hostPeers[viewerId]; if (old && old.pc) { try{ old.pc.close(); }catch(e){} }
+  const cs = getCapStream();
+  if (!cs || !cs.getTracks().length){ hostPeers[viewerId] = {pc:null, want:null}; setTimeout(processStream, 1000); return; }
+  const pc = new RTCPeerConnection(ICE);
+  const hp = {pc, want, seen:new Set(), q:[], remoteSet:false, offerSdp:null};
+  hostPeers[viewerId] = hp;
+  cs.getTracks().forEach(t => { if (t.kind === "video") t.contentHint = "motion"; pc.addTrack(t, cs); });
+  pc.onicecandidate = e => { if (e.candidate) write("POST", `rooms/${code}/rtc/${viewerId}/hc`, candJson(e.candidate)); };
+  pc.onconnectionstatechange = () => updateStreamInfo();
+  applyQuality(pc);
+  try{
+    await write("PATCH", `rooms/${code}/rtc/${viewerId}`, {offer:null, answer:null, hc:null, vc:null});
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    applyQuality(pc);
+    hp.offerSdp = pc.localDescription.sdp;
+    write("PUT", `rooms/${code}/rtc/${viewerId}/offer`, hp.offerSdp);
+  }catch(e){ pop("Stream error: " + e.message); }
+}
+function startStreaming(){
+  if (!canCapture()) return pop("This browser can't stream. Use Chrome on Android.");
+  if (!fileMeta) return pop("Choose your movie file first");
+  write("PUT", `rooms/${code}/stream`, {on:true, q:$("qual").value});
+  keepAwake(true);
+}
+function stopStreaming(){
+  write("DELETE", `rooms/${code}/stream`);
+  write("DELETE", `rooms/${code}/rtc`);
+  closeHostPeers(); keepAwake(false); updateStreamInfo();
+}
+function updateStreamInfo(){
+  if (!code || !isHost()) return;
+  const on = room.stream && room.stream.on;
+  const n = Object.values(hostPeers).filter(h => h.pc && h.pc.connectionState === "connected").length;
+  $("streamInfo").textContent = !canCapture() ? "This browser can't stream. Use Chrome on Android."
+    : !fileMeta ? "Choose your movie file first."
+    : on ? `Streaming to ${n} viewer${n === 1 ? "" : "s"}. Open the player and press play. Keep this screen on.`
+    : "Others can watch without the movie file. Needs good upload speed on your side.";
+}
+
+/* ---- viewer side ---- */
+function closeViewerPeer(){
+  if (vp && vp.pc){ try{ vp.pc.close(); }catch(e){} }
+  vp = null;
+  const rv = $("rv"); rv.srcObject = null;
+}
+function watchStream(){
+  if (!code || isHost()) return;
+  streamWanted = true;
+  $("viewer").classList.add("on"); $("tap").style.display = "none";
+  $("vstatus").textContent = "Connecting to host…";
+  closeViewerPeer();
+  keepAwake(true);
+  write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:1, diff:0, viaStream:true});
+  write("PATCH", `rooms/${code}/rtc/${myId}`, {want:Date.now(), offer:null, answer:null, hc:null, vc:null});
+}
+function stopWatching(){
+  streamWanted = false; closeViewerPeer(); keepAwake(false);
+  $("viewer").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  write("DELETE", `rooms/${code}/rtc/${myId}`);
+  write("PATCH", `rooms/${code}/people/${myId}`, {verified:false, ready:false, viaStream:null});
+  sentKey = null; ensureVerified();
+}
+async function startViewerPeer(offerSdp){
+  closeViewerPeer();
+  const pc = new RTCPeerConnection(ICE);
+  const me = {pc, offer:offerSdp, seen:new Set(), q:[], remoteSet:false};
+  vp = me;
+  pc.onicecandidate = e => { if (e.candidate) write("POST", `rooms/${code}/rtc/${myId}/vc`, candJson(e.candidate)); };
+  pc.ontrack = e => {
+    const rv = $("rv");
+    if (rv.srcObject !== e.streams[0]) rv.srcObject = e.streams[0];
+    rv.play().then(() => $("tap").style.display = "none").catch(() => $("tap").style.display = "block");
+  };
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    $("vstatus").textContent = s === "connected" ? "● Live" : s === "disconnected" ? "Connection unstable… reconnecting"
+      : s === "failed" ? "Could not connect directly. Tap ↻ to retry (some mobile networks block direct connections)." : "Connecting…";
+  };
+  try{
+    await pc.setRemoteDescription({type:"offer", sdp:offerSdp});
+    me.remoteSet = true; flushCandidates(me);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    write("PUT", `rooms/${code}/rtc/${myId}/answer`, pc.localDescription.sdp);
+    const n = room.rtc && room.rtc[myId]; feedCandidates(me, n && n.hc);
+  }catch(e){ $("vstatus").textContent = "Stream error: " + e.message; }
+}
+
+/* ---- called on every room change ---- */
+function processStream(){
+  if (!code) return;
+  const rtc = room.rtc || {};
+  if (isHost()){
+    if (room.mode === "stream" && fileMeta && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
+      autoStreamKey = fileLabel + fileMeta.size;     // stream rooms start streaming as soon as the file is ready
+      startStreaming();
+    }
+    if (room.stream && room.stream.q && room.stream.q !== lastQ){
+      lastQ = room.stream.q;
+      Object.values(hostPeers).forEach(h => h.pc && applyQuality(h.pc));
+    }
+    if (room.stream && room.stream.on && fileMeta){
+      for (const [vId, node] of Object.entries(rtc)){
+        if (!node || !room.people || !room.people[vId]) continue;
+        const hp = hostPeers[vId];
+        if (node.want && (!hp || hp.want !== node.want)){ startHostPeer(vId, node.want); continue; }
+        if (hp && hp.pc){
+          if (node.answer && !hp.remoteSet && hp.offerSdp && node.offer === hp.offerSdp){
+            hp.remoteSet = true;
+            hp.pc.setRemoteDescription({type:"answer", sdp:node.answer}).then(() => flushCandidates(hp)).catch(() => { hp.remoteSet = false; });
+          }
+          feedCandidates(hp, node.vc);
+        }
+      }
+    }
+    for (const vId of Object.keys(hostPeers)){
+      if (!room.people || !room.people[vId]){ try{ hostPeers[vId].pc && hostPeers[vId].pc.close(); }catch(e){} delete hostPeers[vId]; }
+    }
+    updateStreamInfo();
+  } else if (streamWanted){
+    if (!(room.stream && room.stream.on)){
+      $("vstatus").textContent = "Host stopped streaming";
+      streamWanted = false; closeViewerPeer();
+      return;
+    }
+    const node = rtc[myId];
+    if (node && node.offer && (!vp || vp.offer !== node.offer)) startViewerPeer(node.offer);
+    else if (vp && node) feedCandidates(vp, node.hc);
+  }
+}
+function renderStreamCard(){
+  const card = $("streamCard"), on = !!(room.stream && room.stream.on);
+  /* stream rooms: guests only watch, so hide the file picker + sync button for them */
+  const sr = room.mode === "stream";
+  $("file").closest(".card").style.display = (sr && !isHost()) ? "none" : "block";
+  if (sr){
+    if (isHost()){
+      $("main").style.display = "block"; $("main").textContent = "Open player"; $("main").disabled = !fileMeta;
+      $("roomMsg").textContent = !fileMeta ? "Choose your movie file to start streaming" : on ? "Streaming. Open the player and press play." : "Starting the stream…";
+    } else {
+      $("main").style.display = "none";
+      $("roomMsg").textContent = on ? "The host is streaming. Tap Watch live stream below." : "Waiting for the host to start streaming…";
+    }
+  } else $("main").style.display = "block";
+  if (isHost()){
+    card.style.display = "block"; $("streamHost").style.display = "block"; $("streamGuest").style.display = "none";
+    $("streamBtn").disabled = !fileMeta || !canCapture();
+    $("streamBtn").textContent = on ? "Stop streaming" : "Start streaming";
+    if (on && room.stream.q) $("qual").value = room.stream.q;
+    updateStreamInfo();
+  } else if (on && people.some(p => p.host && p.online)){
+    card.style.display = "block"; $("streamHost").style.display = "none"; $("streamGuest").style.display = "block";
+  } else card.style.display = "none";
+}
+$("streamBtn").onclick = () => (room.stream && room.stream.on) ? stopStreaming() : startStreaming();
+$("qual").onchange = () => { if (code && isHost() && room.stream && room.stream.on) write("PATCH", `rooms/${code}/stream`, {q:$("qual").value}); };
+$("watchBtn").onclick = watchStream;
+$("vback").onclick = stopWatching;
+$("vretry").onclick = watchStream;
+$("tap").onclick = () => $("rv").play().then(() => $("tap").style.display = "none").catch(()=>{});
+$("vfs").onclick = () => {
+  const rv = $("rv"), c = $("viewer");
+  if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
+  else if (rv.webkitEnterFullscreen) rv.webkitEnterFullscreen();
+};
+
+/* ================= chat (messages live at rooms/<code>/chat, newest last) ================= */
+let autoStreamKey = null, chatOpen = false, chatSeen = new Set(), chatReady = false, unread = 0;
+const chatList = () => Object.entries(room.chat || {}).filter(([k,m]) => m && m.m).sort((a,b) => a[0] < b[0] ? -1 : 1).slice(-80);
+function setBadge(){ for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).textContent = unread ? "💬 " + unread : "💬" + (id === "chatBtnL" ? " Chat" : ""); }
+function renderChatLog(list){
+  const log = $("chatLog"); log.innerHTML = "";
+  for (const [k,m] of list){
+    const d = document.createElement("div"); d.className = "cm";
+    const b = document.createElement("b"); b.textContent = (m.i === myId ? "You" : (m.n || "Guest")) + ": ";
+    if (m.i === myId) b.style.color = "#8fd4ff";
+    d.appendChild(b); d.appendChild(document.createTextNode(m.m)); log.appendChild(d);
+  }
+  log.scrollTop = log.scrollHeight;
+}
+function chatUpdate(){
+  if (!code) return;
+  const list = chatList();
+  for (const [k,m] of list){
+    if (chatSeen.has(k)) continue; chatSeen.add(k);
+    if (chatReady && m.i !== myId && !chatOpen){ unread++; pop((m.n || "Guest") + ": " + m.m.slice(0, 60)); }
+  }
+  chatReady = true;
+  if (chatOpen){ unread = 0; renderChatLog(list); }
+  setBadge();
+}
+function toggleChat(open){
+  chatOpen = open === undefined ? !chatOpen : open;
+  $("chat").classList.toggle("on", chatOpen);
+  if (chatOpen){ unread = 0; renderChatLog(chatList()); setBadge(); }
+}
+$("chatForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = $("chatIn").value.trim().slice(0, 300);
+  if (!t || !code) return;
+  $("chatIn").value = "";
+  write("POST", `rooms/${code}/chat`, {n:nick || "Guest", i:myId, m:t, t:SV});
+});
+for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).onclick = e => { e.stopPropagation(); toggleChat(); };
+$("chatClose").onclick = () => toggleChat(false);
+
 /* ================= buttons ================= */
-$("create").onclick = createRoom;
+$("create").onclick = () => createRoom("sync");
+$("createStream").onclick = () => createRoom("stream");
 $("join").onclick = joinRoom;
 $("leave").onclick = () => { if (confirm(isHost() ? "End this room for everyone?" : "Leave the room?")) leaveRoom(); };
 $("ctlAll").onclick = () => write("PUT", `rooms/${code}/controlAll`, !controlAll);
