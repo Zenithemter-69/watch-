@@ -113,16 +113,6 @@
     <button class="sec" id="ctlAll" style="display:none;margin-top:6px;font-size:14px">Give control to everyone</button>
   </div>
 
-  <div class="card">
-    <label>Your copy of the movie (must be the same movie as the host)</label>
-    <div class="who" id="hostMovie" style="margin:0 0 8px"></div>
-    <label class="filebtn">📁 Choose movie file
-      <input id="file" type="file" accept="video/*">
-    </label>
-    <div class="who" id="fileName">No file chosen</div>
-    <div class="who" id="fileHint"></div>
-  </div>
-
   <div class="card" id="streamCard" style="display:none">
     <label>📡 Live streaming (the other phone does not need the movie file)</label>
     <div id="streamHost" style="display:none">
@@ -142,6 +132,16 @@
     </div>
   </div>
 
+  <div class="card">
+    <label>Your copy of the movie (must be the same movie as the host)</label>
+    <div class="who" id="hostMovie" style="margin:0 0 8px"></div>
+    <label class="filebtn">📁 Choose movie file
+      <input id="file" type="file" accept="video/*">
+    </label>
+    <div class="who" id="fileName">No file chosen</div>
+    <div class="who" id="fileHint"></div>
+  </div>
+
   <div class="msg" id="roomMsg"></div>
   <div class="card"><button id="main" disabled>Start</button></div>
   <button class="red" id="leave">Leave room</button>
@@ -149,7 +149,7 @@
 
 <!-- PLAYER -->
 <div id="player">
-  <video id="vid" playsinline webkit-playsinline preload="auto"></video>
+  <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
   <div id="cd"></div>
   <div id="status"></div>
   <div id="pop"></div>
@@ -304,6 +304,7 @@ function enterRoom(c, id){
   err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null; gotData = false;
   tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
   controlAll = false; controllers = new Set();
+  try{ localStorage.wp_room = JSON.stringify({c, id, t:Date.now()}); }catch(e){}
   history.replaceState(null, "", "#"+c);
   $("roomCode").textContent = c.slice(0,3)+" "+c.slice(3);
   show("lobby");
@@ -323,6 +324,7 @@ function cleanup(msg){
   vid.pause(); inPlayer = false; $("player").classList.remove("on");
   if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   code = null; myId = null; room = {}; offset = null; driftF = null;
+  try{ localStorage.removeItem("wp_room"); }catch(e){}
   history.replaceState(null, "", location.pathname);
   show("home"); err(msg || "");
 }
@@ -365,7 +367,7 @@ function setAt(path, val){
 }
 
 /* ================= room changed ================= */
-let people = [], knownP = {}, knownInit = false, gotData = false;
+let people = [], knownP = {}, knownInit = false, gotData = false, lastAllReady = false;
 function onRoom(){
   if (!code) return;
   if (!gotData) return;                       // room data has not arrived yet
@@ -499,20 +501,21 @@ function renderLobby(){
   // main button + message
   const online = people.filter(p => p.online);
   const allReady = !!mv && online.length > 0 && online.every(p => p.verified && p.ready);
+  lastAllReady = allReady;
   const hostOffline = people.some(p => p.host && !p.online);
   const b = $("main"), msg = $("roomMsg");
   let m = "";
-  if (!fileMeta) m = isHost() ? "Choose your movie file to continue" : "Choose the same movie file as the host";
+  if (!fileMeta) m = isHost() ? "Choose your movie file to continue" : (room.stream && room.stream.on ? "No movie file? Tap Watch live stream below. Or choose the same file as the host." : "Choose the same movie file as the host, or wait for the host to start streaming.");
   else if (!isHost() && !mv) m = "Waiting for the host to pick a movie…";
   else if (hostOffline) m = "Host disconnected - waiting for them to return";
   else if (!isHost() && matchLevel === 3) m = "⚠ Your file's length is different from the host's (" + fmt(Math.abs(matchDiff)) + (matchDiff > 0 ? " longer" : " shorter") + "). Positions may not line up.";
   else if (started()) m = "";
-  else m = allReady ? "Everyone is ready" : "Waiting for everyone to be ready";
+  else m = allReady ? "Everyone is ready" : (room.stream && room.stream.on ? "Anyone without the movie file can tap Watch live stream" : "Waiting for everyone to be ready");
   msg.textContent = m;
 
   if (isHost()){
-    b.textContent = started() ? "Open player" : (allReady ? "Start" : "Start (waiting for everyone)");
-    b.disabled = !fileMeta || (!started() && !allReady);
+    b.textContent = started() ? "Open player" : (allReady ? "Start" : "Open player");
+    b.disabled = !fileMeta;
   } else {
     b.textContent = started() ? "▶ Join the movie" : "Waiting for the host to start";
     b.disabled = !fileMeta || !mv || !started();
@@ -521,7 +524,7 @@ function renderLobby(){
   renderStreamCard();
 }
 $("main").onclick = () => {
-  if (isHost() && !started() && room.mode !== "stream"){ sendCmd("play", 0); }
+  if (isHost() && !started() && room.mode !== "stream" && lastAllReady){ sendCmd("play", 0); }
   openPlayer();
 };
 
@@ -556,7 +559,7 @@ const vid = $("vid");
 function prog(fn){ lastProg = Date.now(); fn(); }
 function openPlayer(){
   if (!fileUrl) return;
-  inPlayer = true;
+  inPlayer = true; vid.preload = "auto";
   $("title").textContent = fileLabel.replace(/\.[^.]+$/, "");
   $("player").classList.add("on");
   showUi();
@@ -815,8 +818,8 @@ function processStream(){
   if (!code) return;
   const rtc = room.rtc || {};
   if (isHost()){
-    if (room.mode === "stream" && fileMeta && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
-      autoStreamKey = fileLabel + fileMeta.size;     // stream rooms start streaming as soon as the file is ready
+    if (fileMeta && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
+      autoStreamKey = fileLabel + fileMeta.size;     // streaming is offered as soon as the host's file is ready
       startStreaming();
     }
     if (room.stream && room.stream.q && room.stream.q !== lastQ){
@@ -928,6 +931,10 @@ $("chatForm").addEventListener("submit", e => {
 for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).onclick = e => { e.stopPropagation(); toggleChat(); };
 $("chatClose").onclick = () => toggleChat(false);
 
+/* show any unexpected error on screen instead of failing silently */
+window.addEventListener("error", e => { try{ pop("Error: " + (e.message || "unknown")); }catch(_){} });
+window.addEventListener("unhandledrejection", e => { try{ pop("Error: " + ((e.reason && e.reason.message) || e.reason || "unknown")); }catch(_){} });
+
 /* ================= buttons ================= */
 $("create").onclick = () => createRoom("sync");
 $("createStream").onclick = () => createRoom("stream");
@@ -941,6 +948,20 @@ $("invite").onclick = async () => {
 };
 $("nick").addEventListener("change", saveNick);
 if (/^#\d{6}$/.test(location.hash)) $("codeIn").value = location.hash.slice(1);
+
+/* rejoin the room after a page reload */
+(async function resume(){
+  try{
+    const sv = JSON.parse(localStorage.wp_room || "null");
+    if (!sv || !nick || Date.now() - sv.t > 6*3600*1000) return;
+    const host = await getJson(`rooms/${sv.c}/hostId`);
+    if (!host){ localStorage.removeItem("wp_room"); return; }
+    const me = await getJson(`rooms/${sv.c}/people/${sv.id}`);
+    if (!me) await write("PUT", `rooms/${sv.c}/people/${sv.id}`, {name:nick, verified:false, ready:false, seen:SV});
+    enterRoom(sv.c, sv.id);
+    pop("Rejoined your room - choose the movie file again if you need it");
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
