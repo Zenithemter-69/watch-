@@ -35,6 +35,11 @@
   /* player */
   #player{position:fixed;inset:0;background:#000;display:none;z-index:5}
   #player.on{display:block}
+  video::cue{font-size:clamp(14px,3.6vw,26px);background:rgba(0,0,0,.65);color:#fff}
+  #plist{position:fixed;top:60px;right:12px;min-width:220px;max-width:86vw;background:#0E0E10f2;border:1px solid #2a2a2e;border-radius:14px;padding:12px 14px;z-index:9;display:none;font-size:14px}
+  #plist.on{display:block}
+  #plist div{padding:5px 0}
+  #plist small{color:#9a9aa2;display:block}
   video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
   #cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;text-shadow:0 0 20px #000;pointer-events:none}
   #ui{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(#000a,#0000 25%,#0000 65%,#000c)}
@@ -140,6 +145,9 @@
     </label>
     <div class="who" id="fileName">No file chosen</div>
     <div class="who" id="fileHint"></div>
+    <label class="filebtn" style="margin-top:8px">💬 Subtitles (.srt / .vtt, optional)
+      <input id="subFile" type="file">
+    </label>
   </div>
 
   <div class="msg" id="roomMsg"></div>
@@ -158,8 +166,9 @@
       <button class="chip sec" id="back">‹ Back</button>
       <div class="t" id="title"></div>
       <button class="chip sec" id="audBtn">🔊</button>
+      <button class="chip sec" id="ccBtn">CC</button>
       <button class="chip sec" id="chatBtnP">💬</button>
-      <div class="chip" id="ppl">👥 1</div>
+      <button class="chip sec" id="ppl">👥 1</button>
     </div>
     <div class="mid">
       <button class="rb" id="b10">−10s</button>
@@ -174,6 +183,8 @@
     </div>
   </div>
 </div>
+
+<div id="plist"></div>
 
 <!-- CHAT (slides in from the right, over any screen) -->
 <div id="chat">
@@ -428,7 +439,7 @@ $("file").addEventListener("change", e => {
   if (fileUrl) URL.revokeObjectURL(fileUrl);
   try{ fileUrl = URL.createObjectURL(f); }catch(ex){ $("fileHint").textContent = "⚠ Could not open that file: " + ex.message; return; }
   fileLabel = f.name; fileMeta = null; sentKey = null;
-  closeHostPeers(); capStream = null;
+  closeHostPeers(); capStream = null; clearSubs();
   $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   $("fileHint").textContent = isIOS && /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? "⚠ iPhone can't play this format. Use an .mp4 / .mov (H.264)." : "Reading movie length…";
@@ -437,12 +448,61 @@ $("file").addEventListener("change", e => {
   vid.onloadedmetadata = () => {
     fileMeta = {durMs: Math.round(vid.duration*1000), w: vid.videoWidth, h: vid.videoHeight, size};
     if (!/⚠/.test($("fileHint").textContent)) $("fileHint").textContent = "Length " + fmt(fileMeta.durMs);
-    ensureVerified(); renderLobby();
+    ensureVerified(); renderLobby(); restoreSubs();
   };
   vid.onerror = () => { $("fileHint").textContent = "⚠ This phone can't play that file. Try an .mp4 (H.264)."; };
   vid.src = fileUrl;
   renderLobby();
 });
+
+/* subtitles: .srt/.vtt, English by default, remembered per movie file */
+let subUrl = null, subEl = null, subsOn = true;
+function srtToVtt(t){ t = t.replace(/^\uFEFF/, "").replace(/\r+/g, ""); return /^WEBVTT/.test(t) ? t : "WEBVTT\n\n" + t.replace(/(\d+:\d+:\d+),(\d+)/g, "$1.$2"); }
+function clearSubs(){ try{ if (subEl) subEl.remove(); if (subUrl) URL.revokeObjectURL(subUrl); }catch(_){} subEl = null; subUrl = null; }
+function setSubs(text){
+  clearSubs();
+  subUrl = URL.createObjectURL(new Blob([srtToVtt(text)], {type:"text/vtt"}));
+  subEl = document.createElement("track");
+  subEl.kind = "subtitles"; subEl.label = "English"; subEl.srclang = "en"; subEl.src = subUrl; subEl.default = true;
+  vid.appendChild(subEl);
+  subEl.track.mode = subsOn ? "showing" : "disabled";
+}
+function autoEnglish(){
+  try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ if (/^en/i.test(tt.language || "") || /eng/i.test(tt.label || "")) tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
+}
+function subKey(){ return fileMeta ? "subs:" + fileLabel + ":" + fileMeta.size : null; }
+function restoreSubs(){ try{ const k = subKey(), t = k && localStorage.getItem(k); if (t) setSubs(t); }catch(_){} autoEnglish(); }
+$("subFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const text = await f.text(); setSubs(text); subsOn = true;
+    const k = subKey(); if (k && text.length < 1500000) { try{ localStorage.setItem(k, text); }catch(_){} }
+    $("fileHint").textContent = "Subtitles loaded: " + f.name;
+  }catch(ex){ $("fileHint").textContent = "⚠ Could not read subtitles: " + ex.message; }
+});
+$("ccBtn").onclick = () => {
+  subsOn = !subsOn;
+  let any = false;
+  try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ any = true; tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
+  pop(any ? (subsOn ? "Subtitles on" : "Subtitles off") : "No subtitles loaded. Add a .srt file in the lobby.");
+  showUi();
+};
+
+/* people list */
+$("ppl").onclick = e => {
+  e.stopPropagation();
+  const box = $("plist");
+  if (box.classList.contains("on")) { box.classList.remove("on"); return; }
+  box.innerHTML = "";
+  for (const p of people){
+    const d = document.createElement("div");
+    d.textContent = (p.host ? "👑 " : "") + p.name;
+    const sm = document.createElement("small"); sm.textContent = personStatus(p); d.appendChild(sm);
+    box.appendChild(d);
+  }
+  box.classList.add("on");
+};
+document.addEventListener("click", e => { if (!e.target.closest("#ppl,#plist")) $("plist").classList.remove("on"); });
 
 /* Same rules as the Android app: host's file is the reference; guests compare by length.
    (A browser can't hash a multi-GB file, so identical-hash matches are never claimed here.) */
@@ -457,8 +517,8 @@ function ensureVerified(){
     matchLevel = 1; matchDiff = 0;
   } else if (mv){
     const hostDur = +mv.dur || 0, known = hostDur > 0 && fileMeta.durMs > 0;
-    const diff = known ? fileMeta.durMs - hostDur : 0;
-    const level = known && Math.abs(diff) <= 1000 ? 2 : 3;
+    const diff = 0;
+    const level = 1;
     const key = `g:${level}:${diff}:${mv.name}:${fileMeta.size}`;
     if (sentKey === key) return; sentKey = key;
     matchLevel = level; matchDiff = diff;
@@ -676,7 +736,8 @@ $("player").addEventListener("click", e => {
   $("ui").classList.contains("hide") ? showUi() : $("ui").classList.add("hide");
 });
 $("fs").onclick = () => {
-  const c = $("player");
+  const c = document.documentElement;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(()=>{}); return; }
   if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
   else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();     // iPhone Safari
 };
@@ -903,7 +964,8 @@ $("vback").onclick = stopWatching;
 $("vretry").onclick = watchStream;
 $("tap").onclick = () => $("rv").play().then(() => $("tap").style.display = "none").catch(()=>{});
 $("vfs").onclick = () => {
-  const rv = $("rv"), c = $("viewer");
+  const rv = $("rv"), c = document.documentElement;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(()=>{}); return; }
   if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
   else if (rv.webkitEnterFullscreen) rv.webkitEnterFullscreen();
 };
