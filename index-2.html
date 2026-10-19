@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WatchParty">
+<title>WatchParty</title>
+<style>
+  :root{--accent:#2BD67B;--card:#1B1B1F;--bg:#0E0E10;--txt:#f2f2f2;--mute:#9a9aa2;--warn:#FFB74D}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif}
+  .screen{display:none;min-height:100%;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
+  .screen.on{display:block}
+  h1{margin:8px 0 4px;font-size:26px}
+  p.sub{margin:0 0 18px;color:var(--mute);font-size:14px}
+  .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--mute);margin:0 0 6px}
+  input[type=text],input[type=tel]{width:100%;padding:13px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:17px}
+  button{font:inherit;border:0;border-radius:12px;padding:14px 16px;font-size:16px;font-weight:600;color:#06140c;background:var(--accent);width:100%}
+  button.sec{background:#2a2a2e;color:var(--txt)}
+  button.red{background:transparent;color:#ff6b6b}
+  button:disabled{opacity:.4}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  .code{font-size:34px;letter-spacing:6px;text-align:center;font-weight:800;color:var(--accent);margin:6px 0}
+  .who{font-size:13px;color:var(--mute);margin-top:8px;line-height:1.4}
+  .filebtn{display:block;text-align:center;background:#2a2a2e;border-radius:12px;padding:14px;font-weight:600;font-size:16px}
+  .filebtn input{display:none}
+  .msg{color:var(--warn);font-size:13px;min-height:18px;margin:6px 0}
+  .person{display:flex;align-items:center;gap:10px;background:#121214;border-radius:12px;padding:10px 12px;margin-bottom:6px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#666;flex:none}
+  .person .n{font-size:15px}.person .s{font-size:12px;color:var(--mute)}
+  .person .ctl{margin-left:auto;font-size:13px;color:var(--mute);width:auto;background:none;padding:6px 8px}
+  .person .ctl.on{color:var(--accent)}
+  /* player */
+  #player{position:fixed;inset:0;background:#000;display:none;z-index:5}
+  #player.on{display:block}
+  video::cue{font-size:clamp(14px,3.6vw,26px);background:rgba(0,0,0,.65);color:#fff}
+  #plist{position:fixed;top:60px;right:12px;min-width:220px;max-width:86vw;background:#0E0E10f2;border:1px solid #2a2a2e;border-radius:14px;padding:12px 14px;z-index:9;display:none;font-size:14px}
+  #plist.on{display:block}
+  #plist div{padding:5px 0}
+  #plist small{color:#9a9aa2;display:block}
+  video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+  #cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;text-shadow:0 0 20px #000;pointer-events:none}
+  #ui{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(#000a,#0000 25%,#0000 65%,#000c)}
+  #ui.hide{opacity:0;pointer-events:none}
+  .top,.bot{display:flex;align-items:center;gap:10px}
+  .top .t{flex:1;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip{background:#000a;border-radius:20px;padding:8px 12px;font-size:13px;width:auto}
+  .mid{display:flex;justify-content:center;align-items:center;gap:28px}
+  .rb{width:64px;height:64px;border-radius:50%;background:#000a;color:#fff;font-size:15px;padding:0}
+  .rb.big{width:84px;height:84px;font-size:34px;background:var(--accent);color:#06140c}
+  input[type=range]{flex:1;accent-color:var(--accent);height:30px}
+  .tm{font-size:12px;font-variant-numeric:tabular-nums;color:#ddd;min-width:44px;text-align:center}
+  #pop{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:#2a2a2eEE;padding:8px 16px;border-radius:20px;font-size:13px;display:none;max-width:90%;text-align:center;z-index:9}
+  #status{position:absolute;bottom:92px;left:0;right:0;text-align:center;font-size:12px;color:#ddd;pointer-events:none}
+  select{padding:13px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:15px;flex:1}
+  #viewer{position:fixed;inset:0;background:#000;display:none;z-index:6}
+  #viewer.on{display:block}
+  #rv{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  #vbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;background:linear-gradient(#000a,#0000)}
+  #vbar .t{flex:1;font-size:13px}
+  #tap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:18px 28px;display:none;font-size:18px}
+  #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10ee;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
+  #chat.on{display:flex}
+  #chatHead{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
+  #chatLog{flex:1;overflow-y:auto;padding:6px 12px;-webkit-overflow-scrolling:touch}
+  .cm{margin-bottom:8px;font-size:14px;line-height:1.35;word-wrap:break-word;overflow-wrap:anywhere}
+  .cm b{color:var(--accent)}
+  #chatForm{display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  #chatIn{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:16px}
+  #lpop{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2a2a2e;padding:8px 16px;border-radius:20px;font-size:13px;display:none;z-index:9}
+</style>
+</head>
+<body>
+
+<div id="lpop"></div>
+
+<!-- HOME -->
+<div id="home" class="screen on">
+  <h1>🎬 WatchParty</h1>
+  <p class="sub">Watch the same movie together, in sync. Works with the Android app and on iPhone.</p>
+  <div class="card">
+    <label>Your nickname</label>
+    <input id="nick" type="text" maxlength="20" placeholder="e.g. Nis" autocomplete="off">
+  </div>
+  <div class="card">
+    <button id="create">Create room</button>
+    <div class="who">Everyone picks the same movie file on their own phone. Works well with weak internet.</div>
+  </div>
+  <div class="card">
+    <button id="createStream" class="sec">📡 Create stream room</button>
+    <div class="who">You play the movie and the other phone watches it live. They don't need the file. Needs good upload speed on your phone (use Chrome on Android).</div>
+  </div>
+  <div class="card">
+    <label>Or join with a 6-digit code</label>
+    <div class="row">
+      <input id="codeIn" type="tel" maxlength="6" placeholder="123456" inputmode="numeric" style="flex:2">
+      <button id="join" style="flex:1">Join</button>
+    </div>
+  </div>
+  <div class="msg" id="err"></div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobby" class="screen">
+  <h1>Room</h1>
+  <div class="card">
+    <label>Room code</label>
+    <div class="code" id="roomCode">------</div>
+    <button class="sec" id="invite">Share invite</button>
+    <button class="sec" id="chatBtnL" style="margin-top:8px">💬 Chat</button>
+  </div>
+
+  <div class="card">
+    <label>Watching</label>
+    <div id="people"></div>
+    <button class="sec" id="ctlAll" style="display:none;margin-top:6px;font-size:14px">Give control to everyone</button>
+  </div>
+
+  <div class="card" id="streamCard" style="display:none">
+    <label>📡 Live streaming (the other phone does not need the movie file)</label>
+    <div id="streamHost" style="display:none">
+      <div class="row">
+        <select id="qual">
+          <option value="low">Low (weak internet)</option>
+          <option value="med" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <button id="streamBtn" class="sec" style="flex:1.2">Start streaming</button>
+      </div>
+      <div class="who" id="streamInfo"></div>
+    </div>
+    <div id="streamGuest" style="display:none">
+      <button id="watchBtn">📡 Watch live stream</button>
+      <div class="who">The host's phone sends the movie to you. No file needed.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Your copy of the movie (must be the same movie as the host)</label>
+    <div class="who" id="hostMovie" style="margin:0 0 8px"></div>
+    <label class="filebtn">📁 Choose movie file
+      <input id="file" type="file" accept="video/*">
+    </label>
+    <div class="who" id="fileName">No file chosen</div>
+    <div class="who" id="fileHint"></div>
+    <label class="filebtn" style="margin-top:8px">💬 Subtitles (.srt / .vtt, optional)
+      <input id="subFile" type="file">
+    </label>
+  </div>
+
+  <div class="msg" id="roomMsg"></div>
+  <div class="card"><button id="main" disabled>Start</button></div>
+  <button class="red" id="leave">Leave room</button>
+</div>
+
+<!-- PLAYER -->
+<div id="player">
+  <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
+  <div id="cd"></div>
+  <div id="status"></div>
+  <div id="pop"></div>
+  <div id="ui">
+    <div class="top">
+      <button class="chip sec" id="back">‹ Back</button>
+      <div class="t" id="title"></div>
+      <button class="chip sec" id="audBtn">🔊</button>
+      <button class="chip sec" id="ccBtn">CC</button>
+      <button class="chip sec" id="chatBtnP">💬</button>
+      <button class="chip sec" id="ppl">👥 1</button>
+    </div>
+    <div class="mid">
+      <button class="rb" id="b10">−10s</button>
+      <button class="rb big" id="pp">▶</button>
+      <button class="rb" id="f10">+10s</button>
+    </div>
+    <div class="bot">
+      <div class="tm" id="tNow">0:00</div>
+      <input type="range" id="seek" min="0" max="1000" value="0">
+      <div class="tm" id="tDur">0:00</div>
+      <button class="chip sec" id="fs">⛶</button>
+    </div>
+  </div>
+</div>
+
+<div id="plist"></div>
+
+<!-- CHAT (slides in from the right, over any screen) -->
+<div id="chat">
+  <div id="chatHead"><b>💬 Chat</b><button class="chip sec" id="chatClose">✕</button></div>
+  <div id="chatLog"></div>
+  <form id="chatForm" autocomplete="off">
+    <input id="chatIn" type="text" maxlength="300" placeholder="Type a message…" enterkeyhint="send">
+    <button type="submit" style="width:auto;padding:12px 16px">Send</button>
+  </form>
+</div>
+
+<!-- STREAM VIEWER -->
+<div id="viewer">
+  <video id="rv" playsinline webkit-playsinline autoplay></video>
+  <button id="tap">▶ Tap to play</button>
+  <div id="vbar">
+    <button class="chip sec" id="vback">‹ Back</button>
+    <div class="t" id="vstatus">Connecting…</div>
+    <button class="chip sec" id="chatBtnV">💬</button>
+    <button class="chip sec" id="vretry">↻</button>
+    <button class="chip sec" id="vfs">⛶</button>
+  </div>
+</div>
+
+<script>
+/* ================= config (same Firebase + same data layout as the Android app) ================= */
+const DB = "https://study-app-fff47-default-rtdb.firebaseio.com";
+const START_LEAD = 3000, RESUME_LEAD = 1500, ONLINE_WINDOW = 25000;
+const SV = {".sv":"timestamp"};
+const $ = id => document.getElementById(id);
+const url = p => `${DB}/${p}.json`;
+
+/* ================= state ================= */
+let nick = localStorage.wp_nick || "";
+let code = null, myId = null, room = {}, es = null;
+let fileUrl = null, fileLabel = "", fileMeta = null;     // fileMeta = {durMs,w,h,size}
+let sentKey = null, matchLevel = 1, matchDiff = 0;
+let offset = null, samples = [];                          // clock: serverNow = performance.now()+offset
+let tlSig = "", tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
+let controlAll = false, controllers = new Set();
+let inPlayer = false, dragging = false, lastProg = 0, hideTimer = null, cdTimer = null;
+let driftF = null, lastSeekAt = 0, timers = [];
+$("nick").value = nick;
+
+/* ================= small helpers ================= */
+const saveNick = () => { nick = $("nick").value.trim().slice(0,20); localStorage.wp_nick = nick; };
+const err = m => $("err").textContent = m || "";
+const fmt = ms => { let s = Math.max(0, ms/1000|0); const h = s/3600|0, m = (s%3600)/60|0, x = s%60; return (h ? h+":"+String(m).padStart(2,"0") : m)+":"+String(x).padStart(2,"0"); };
+const nowSrv = () => offset == null ? null : performance.now() + offset;
+const newId = () => "u" + Array.from(crypto.getRandomValues(new Uint8Array(5))).map(b=>b.toString(16).padStart(2,"0")).join("");
+const isHost = () => code && myId && room.hostId === myId;
+const started = () => tl.state !== "stopped";
+const canControl = () => isHost() || controlAll || controllers.has(myId);
+function show(id){ for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === id); }
+function pop(t){
+  const el = inPlayer ? $("pop") : $("lpop");
+  el.textContent = t; el.style.display = "block"; clearTimeout(el._t); el._t = setTimeout(()=>el.style.display="none", 2400);
+}
+
+/* writes go out one after another so their order is kept */
+let wq = Promise.resolve();
+function write(method, path, body){
+  wq = wq.then(() => fetch(url(path), {method, body: body === undefined ? undefined : JSON.stringify(body)}).then(r=>r.ok)).catch(()=>false);
+  return wq;
+}
+async function getJson(path){ const r = await fetch(url(path)); if (!r.ok) throw new Error("HTTP "+r.status); return r.json(); }
+
+/* ================= clock sync against Firebase server time ================= */
+async function pingClock(){
+  if (!myId) return;
+  try{
+    const t0 = performance.now();
+    const txt = await (await fetch(url(`pings/${myId}`), {method:"PUT", body:JSON.stringify(SV)})).text();
+    const t1 = performance.now(), ts = Number(txt.trim());
+    if (!isFinite(ts)) return;
+    const rtt = t1 - t0;
+    samples.push({rtt, off: ts + rtt/2 - t1, at: t1});
+    samples = samples.filter(s => t1 - s.at < 60000).slice(-12);
+    const best = samples.reduce((a,b)=> b.rtt < a.rtt ? b : a);
+    const first = offset == null;
+    offset = best.off;
+    if (first){ if (inPlayer) applyTl(); onRoom(); }
+  }catch(e){}
+}
+function startClock(){
+  samples = []; offset = null;
+  let n = 0;
+  const loop = async () => { if (!code) return; await pingClock(); n++; timers.push(setTimeout(loop, n < 6 ? 500 : 10000)); };
+  loop();
+}
+
+/* ================= create / join ================= */
+async function createRoom(mode){
+  saveNick(); if (!nick) return err("Type a nickname first");
+  if (mode === "stream" && !(vid.captureStream || vid.mozCaptureStream)) return err("Streaming needs Chrome on Android. On this browser, join a room instead.");
+  err("Creating room…");
+  try{
+    let c = "";
+    for (let i=0;i<8;i++){
+      const t = String(100000 + Math.floor(Math.random()*900000));
+      if ((await getJson(`rooms/${t}/hostId`)) === null){ c = t; break; }
+    }
+    if (!c) throw new Error("no free room code");
+    const id = newId();
+    const r = await fetch(url(`rooms/${c}`), {method:"PUT", body: JSON.stringify({
+      hostId:id, mode:(mode === "stream" ? "stream" : "sync"), createdAt:SV,
+      timeline:{state:"stopped",pos:0,rate:1.0,startAt:0,seq:0},
+      people:{[id]:{name:nick,verified:false,ready:false,seen:SV}}
+    })});
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    enterRoom(c, id);
+  }catch(e){ err("Could not create the room: "+e.message); }
+}
+async function joinRoom(){
+  saveNick(); if (!nick) return err("Type a nickname first");
+  const c = $("codeIn").value.trim();
+  if (!/^\d{6}$/.test(c)) return err("Enter the 6-digit code");
+  err("Joining…");
+  try{
+    const host = await getJson(`rooms/${c}/hostId`);
+    if (!host) return err("Room not found - check the code");
+    const id = newId();
+    const r = await fetch(url(`rooms/${c}/people/${id}`), {method:"PUT", body: JSON.stringify({name:nick,verified:false,ready:false,seen:SV})});
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    enterRoom(c, id);
+  }catch(e){ err("Could not join: "+e.message); }
+}
+function enterRoom(c, id){
+  err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null; gotData = false;
+  tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
+  controlAll = false; controllers = new Set();
+  try{ localStorage.wp_room = JSON.stringify({c, id, t:Date.now()}); }catch(e){}
+  history.replaceState(null, "", "#"+c);
+  $("roomCode").textContent = c.slice(0,3)+" "+c.slice(3);
+  show("lobby");
+  startClock();
+  timers.push(setInterval(heartbeat, 6000));
+  openStream();
+  if (fileMeta) { sentKey = null; ensureVerified(); }
+}
+function cleanup(msg){
+  if (es) es.close(); es = null;
+  closeHostPeers(); closeViewerPeer(); capStream = null; streamWanted = false;
+  $("viewer").classList.remove("on"); keepAwake(false);
+  autoStreamKey = null; chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false;
+  $("chat").classList.remove("on"); $("chatLog").innerHTML = ""; setBadge();
+  timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
+  clearInterval(cdTimer);
+  vid.pause(); inPlayer = false; $("player").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  code = null; myId = null; room = {}; offset = null; driftF = null;
+  try{ localStorage.removeItem("wp_room"); }catch(e){}
+  history.replaceState(null, "", location.pathname);
+  show("home"); err(msg || "");
+}
+function leaveRoom(){
+  if (code && myId){
+    if (isHost()) write("DELETE", `rooms/${code}`);
+    else write("DELETE", `rooms/${code}/people/${myId}`);
+  }
+  if (code && myId && !isHost()) write("DELETE", `rooms/${code}/rtc/${myId}`);
+  cleanup("");
+}
+function heartbeat(){
+  if (code && myId && room.people && room.people[myId]) write("PUT", `rooms/${code}/people/${myId}/seen`, SV);
+  onRoom();
+}
+
+/* ================= live stream (Firebase server-sent events) ================= */
+function openStream(){
+  if (es) es.close();
+  es = new EventSource(url(`rooms/${code}`));
+  es.addEventListener("put",   e => { const d = JSON.parse(e.data); setAt(d.path, d.data); onRoom(); });
+  es.addEventListener("patch", e => {
+    const d = JSON.parse(e.data);
+    for (const k in d.data) setAt((d.path === "/" ? "" : d.path) + "/" + k, d.data[k]);
+    onRoom();
+  });
+  es.addEventListener("cancel", () => cleanup("No access - check your Firebase rules"));
+}
+function setAt(path, val){
+  gotData = true;
+  const segs = path.split("/").filter(Boolean);
+  if (!segs.length){ room = (val && typeof val === "object") ? val : {}; return; }
+  let o = room;
+  for (let i=0;i<segs.length-1;i++){
+    if (o[segs[i]] == null || typeof o[segs[i]] !== "object"){ if (val == null) return; o[segs[i]] = {}; }
+    o = o[segs[i]];
+  }
+  const k = segs[segs.length-1];
+  if (val == null) delete o[k]; else o[k] = val;
+}
+
+/* ================= room changed ================= */
+let people = [], knownP = {}, knownInit = false, gotData = false, lastAllReady = false;
+function onRoom(){
+  if (!code) return;
+  if (!gotData) return;                       // room data has not arrived yet
+  if (!room.hostId) return cleanup("Host closed the room");
+  const now = nowSrv();
+
+  // subtitles shared by the host: guests who didn't pick their own get them automatically
+  if (!isHost() && !subLocal && room.subs && room.subs.text){
+    const rk = (room.subs.name || "") + ":" + room.subs.text.length;
+    if (rk !== subRemoteKey){ subRemoteKey = rk; try{ setSubs(room.subs.text); }catch(_){} }
+  }
+
+  // people
+  const list = [];
+  for (const [id,p] of Object.entries(room.people || {})){
+    if (!p || !p.name) continue;
+    const seen = p.seen || 0;
+    const online = now == null || !seen || now - seen < ONLINE_WINDOW;
+    list.push({id, name:p.name, host:id === room.hostId, online, verified:!!p.verified, ready:!!p.ready, match:p.match||1, diff:p.diff||0, via:!!p.viaStream});
+  }
+  list.sort((a,b)=> (b.host-a.host) || a.name.localeCompare(b.name));
+  if (!list.some(p => p.id === myId)) return cleanup("You were removed from the room");
+  if (knownInit){
+    for (const p of list){
+      if (p.id === myId) continue;
+      const o = knownP[p.id];
+      if (!o && p.online) pop(p.name+" joined");
+      else if (o && o.online && !p.online) pop(p.name+" left");
+      else if (o && !o.online && p.online) pop(p.name+" is back");
+    }
+  }
+  knownP = {}; list.forEach(p => knownP[p.id] = p); knownInit = true; people = list;
+
+  // control rights
+  const hadControl = canControl();
+  controlAll = room.controlAll === true || room.controlAll === "true";
+  controllers = new Set(Object.entries(room.controllers || {}).filter(([k,v]) => v === true || v === "true").map(([k]) => k));
+  if (!isHost() && inPlayer){
+    if (!hadControl && canControl()) pop("You can now control playback");
+    else if (hadControl && !canControl()) pop("Playback control removed");
+  }
+
+  // timeline
+  const t = room.timeline;
+  if (t){
+    const sig = [t.seq,t.state,t.pos,t.startAt].join("|");
+    if (sig !== tlSig){
+      tlSig = sig;
+      tl = {state:t.state, pos:+t.pos||0, startAt:+t.startAt||0, rate:+t.rate||1, seq:+t.seq||0};
+      if (inPlayer) applyTl();
+    }
+  }
+  ensureVerified();
+  processStream();
+  chatUpdate();
+  renderLobby();
+}
+
+/* ================= file + verification ================= */
+$("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{ vid.pause(); vid.removeAttribute("src"); vid.load(); }catch(_){}
+  if (fileUrl) URL.revokeObjectURL(fileUrl);
+  try{ fileUrl = URL.createObjectURL(f); }catch(ex){ $("fileHint").textContent = "⚠ Could not open that file: " + ex.message; return; }
+  fileLabel = f.name; fileMeta = null; sentKey = null;
+  closeHostPeers(); capStream = null; clearSubs();
+  $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  $("fileHint").textContent = isIOS && /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? "⚠ iPhone can't play this format. Use an .mp4 / .mov (H.264)." : "Reading movie length…";
+  if (code && myId) write("PATCH", `rooms/${code}/people/${myId}`, {verified:false, ready:false});
+  const size = f.size;
+  vid.onloadedmetadata = () => {
+    fileMeta = {durMs: Math.round(vid.duration*1000), w: vid.videoWidth, h: vid.videoHeight, size};
+    if (!/⚠/.test($("fileHint").textContent)) $("fileHint").textContent = "Length " + fmt(fileMeta.durMs);
+    ensureVerified(); renderLobby(); restoreSubs();
+  };
+  vid.onerror = () => { $("fileHint").textContent = "⚠ This phone can't play that file. Try an .mp4 (H.264)."; };
+  vid.src = fileUrl;
+  renderLobby();
+});
+
+/* subtitles: .srt/.vtt, English by default, remembered per movie file */
+let subUrl = null, subEl = null, subsOn = true, subLocal = false, subRemoteKey = null;
+function shareSubs(text, name){ try{ if (isHost() && code && text.length < 900000) write("PUT", `rooms/${code}/subs`, {name: name || "subtitles", text}); }catch(_){} }
+function srtToVtt(t){ t = t.replace(/^\uFEFF/, "").replace(/\r+/g, ""); return /^WEBVTT/.test(t) ? t : "WEBVTT\n\n" + t.replace(/(\d+:\d+:\d+),(\d+)/g, "$1.$2"); }
+function clearSubs(){ subLocal = false; subRemoteKey = null; try{ if (subEl) subEl.remove(); if (subUrl) URL.revokeObjectURL(subUrl); }catch(_){} subEl = null; subUrl = null; }
+function setSubs(text){
+  clearSubs();
+  subUrl = URL.createObjectURL(new Blob([srtToVtt(text)], {type:"text/vtt"}));
+  subEl = document.createElement("track");
+  subEl.kind = "subtitles"; subEl.label = "English"; subEl.srclang = "en"; subEl.src = subUrl; subEl.default = true;
+  vid.appendChild(subEl);
+  subEl.track.mode = subsOn ? "showing" : "disabled";
+}
+function autoEnglish(){
+  try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ if (/^en/i.test(tt.language || "") || /eng/i.test(tt.label || "")) tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
+}
+function subKey(){ return fileMeta ? "subs:" + fileLabel + ":" + fileMeta.size : null; }
+function restoreSubs(){ try{ const k = subKey(), t = k && localStorage.getItem(k); if (t){ setSubs(t); subLocal = true; shareSubs(t, "saved"); } }catch(_){} autoEnglish(); }
+$("subFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const text = await f.text(); setSubs(text); subsOn = true; subLocal = true; shareSubs(text, f.name);
+    const k = subKey(); if (k && text.length < 1500000) { try{ localStorage.setItem(k, text); }catch(_){} }
+    $("fileHint").textContent = "Subtitles loaded: " + f.name;
+  }catch(ex){ $("fileHint").textContent = "⚠ Could not read subtitles: " + ex.message; }
+});
+$("ccBtn").onclick = () => {
+  subsOn = !subsOn;
+  let any = false;
+  try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ any = true; tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
+  pop(any ? (subsOn ? "Subtitles on" : "Subtitles off") : "No subtitles loaded. Add a .srt file in the lobby.");
+  showUi();
+};
+
+/* people list */
+$("ppl").onclick = e => {
+  e.stopPropagation();
+  const box = $("plist");
+  if (box.classList.contains("on")) { box.classList.remove("on"); return; }
+  box.innerHTML = "";
+  for (const p of people){
+    const d = document.createElement("div");
+    d.textContent = (p.host ? "👑 " : "") + p.name;
+    const sm = document.createElement("small"); sm.textContent = personStatus(p); d.appendChild(sm);
+    box.appendChild(d);
+  }
+  box.classList.add("on");
+};
+document.addEventListener("click", e => { if (!e.target.closest("#ppl,#plist")) $("plist").classList.remove("on"); });
+
+/* Same rules as the Android app: host's file is the reference; guests compare by length.
+   (A browser can't hash a multi-GB file, so identical-hash matches are never claimed here.) */
+function ensureVerified(){
+  if (!code || !myId || !fileMeta) return;
+  const mv = room.movie;
+  if (isHost()){
+    const key = "h:" + fileLabel + ":" + fileMeta.size;
+    if (sentKey === key) return; sentKey = key;
+    write("PUT", `rooms/${code}/movie`, {hash:"web-"+fileMeta.size, size:fileMeta.size, name:fileLabel, dur:fileMeta.durMs, w:fileMeta.w, h:fileMeta.h});
+    write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:1, diff:0});
+    matchLevel = 1; matchDiff = 0;
+  } else if (mv){
+    const hostDur = +mv.dur || 0, known = hostDur > 0 && fileMeta.durMs > 0;
+    const diff = 0;
+    const level = 1;
+    const key = `g:${level}:${diff}:${mv.name}:${fileMeta.size}`;
+    if (sentKey === key) return; sentKey = key;
+    matchLevel = level; matchDiff = diff;
+    write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:level, diff:known ? diff : 0});
+  }
+}
+
+/* ================= lobby UI ================= */
+function personStatus(p){
+  if (!p.online) return "Offline";
+  if (p.via) return "Watching the live stream";
+  if (room.mode === "stream") return p.host ? "Streaming host" : "In the room";
+  const suffix = !p.verified ? "" : p.match === 2 ? " · different file, same length" : p.match === 3 ? " · ⚠ length differs" : "";
+  if (started()) return "Watching" + suffix;
+  if (p.ready) return "Ready" + suffix;
+  return p.verified ? "Movie verified" + suffix : "Choose the movie file…";
+}
+function renderLobby(){
+  if (!code) return;
+  const box = $("people"); box.innerHTML = "";
+  for (const p of people){
+    const row = document.createElement("div"); row.className = "person";
+    const col = p.online ? ((p.ready || started()) ? "var(--accent)" : "var(--warn)") : "#666";
+    row.innerHTML = `<div class="dot" style="background:${col}"></div><div><div class="n"></div><div class="s"></div></div>`;
+    row.querySelector(".n").textContent = p.name + (p.host ? "  ·  host" : "") + (p.id === myId ? "  (you)" : "");
+    row.querySelector(".s").textContent = personStatus(p);
+    if (isHost() && p.id !== myId){
+      const b = document.createElement("button"); const has = controllers.has(p.id);
+      b.className = "ctl" + (has ? " on" : ""); b.textContent = has ? "Control ✓" : "Give control";
+      b.onclick = () => has ? write("DELETE", `rooms/${code}/controllers/${p.id}`) : write("PUT", `rooms/${code}/controllers/${p.id}`, true);
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
+  $("ctlAll").style.display = isHost() ? "block" : "none";
+  $("ctlAll").textContent = controlAll ? "✓ Everyone can control (tap to stop)" : "Give control to everyone";
+  $("leave").textContent = isHost() ? "End room" : "Leave room";
+
+  const mv = room.movie;
+  $("hostMovie").textContent = (!isHost() && mv) ? `Host is using: ${mv.name}` + (mv.size ? ` (${(mv.size/1048576).toFixed(0)} MB)` : "") : "";
+
+  // main button + message
+  const online = people.filter(p => p.online);
+  const allReady = !!mv && online.length > 0 && online.every(p => p.verified && p.ready);
+  lastAllReady = allReady;
+  const hostOffline = people.some(p => p.host && !p.online);
+  const b = $("main"), msg = $("roomMsg");
+  let m = "";
+  if (!fileMeta) m = isHost() ? "Choose your movie file to continue" : (room.stream && room.stream.on ? "No movie file? Tap Watch live stream below. Or choose the same file as the host." : "Choose the same movie file as the host, or wait for the host to start streaming.");
+  else if (!isHost() && !mv) m = "Waiting for the host to pick a movie…";
+  else if (hostOffline) m = "Host disconnected - waiting for them to return";
+  else if (!isHost() && matchLevel === 3) m = "⚠ Your file's length is different from the host's (" + fmt(Math.abs(matchDiff)) + (matchDiff > 0 ? " longer" : " shorter") + "). Positions may not line up.";
+  else if (started()) m = "";
+  else m = allReady ? "Everyone is ready" : (room.stream && room.stream.on ? "Anyone without the movie file can tap Watch live stream" : "Waiting for everyone to be ready");
+  msg.textContent = m;
+
+  if (isHost()){
+    b.textContent = started() ? "Open player" : (allReady ? "Start" : "Open player");
+    b.disabled = !fileMeta;
+  } else {
+    b.textContent = started() ? "▶ Join the movie" : "Waiting for the host to start";
+    b.disabled = !fileMeta || !mv || !started();
+  }
+  $("ppl").textContent = "👥 " + online.length;
+  renderStreamCard();
+}
+$("main").onclick = () => {
+  if (isHost() && !started() && room.mode !== "stream" && lastAllReady){ sendCmd("play", 0); }
+  openPlayer();
+};
+
+/* ================= commands (same timeline format as the Android app) ================= */
+function expectedMs(){
+  if (tl.state !== "playing") return tl.pos;
+  const n = nowSrv(); if (n == null) return tl.pos;
+  return n >= tl.startAt ? tl.pos + (n - tl.startAt) * tl.rate : tl.pos;
+}
+function sendCmd(type, pos){
+  if (!canControl()) return pop("Only the host can control playback");
+  const n = nowSrv(); if (n == null) return pop("Syncing clock - try again in a second");
+  const seq = Math.max(tl.seq, +(room.timeline && room.timeline.seq) || 0) + 1;
+  let t;
+  if (type === "play"){
+    t = {state:"playing", pos:Math.round(pos), startAt:Math.round(n + (started() ? RESUME_LEAD : START_LEAD)), rate:1, seq};
+  } else if (type === "pause"){
+    t = {state:"paused", pos:Math.round(expectedMs()), startAt:0, rate:1, seq};
+  } else { // seek
+    const p = Math.max(0, Math.round(pos));
+    t = tl.state === "playing" ? {state:"playing", pos:p, startAt:Math.round(n + RESUME_LEAD), rate:1, seq}
+                               : {state:"paused",  pos:p, startAt:0, rate:1, seq};
+  }
+  tl = t; tlSig = [t.seq,t.state,t.pos,t.startAt].join("|");
+  room.timeline = t;
+  write("PUT", `rooms/${code}/timeline`, t);
+  if (inPlayer) applyTl();
+}
+
+/* ================= player ================= */
+const vid = $("vid");
+function prog(fn){ lastProg = Date.now(); fn(); }
+function openPlayer(){
+  if (!fileUrl) return;
+  inPlayer = true; vid.preload = "auto";
+  $("title").textContent = fileLabel.replace(/\.[^.]+$/, "");
+  $("player").classList.add("on");
+  showUi();
+  // iOS only lets a page start video after a tap: do a silent play/pause "unlock" right now
+  vid.muted = true;
+  const u = vid.play();
+  const done = () => { prog(()=>vid.pause()); vid.muted = false; applyTl(); };
+  if (u && u.then) u.then(done, done); else done();
+  renderPlayerUi();
+}
+function closePlayer(){
+  inPlayer = false; clearInterval(cdTimer); $("cd").style.display = "none";
+  prog(()=>vid.pause());
+  $("player").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  renderLobby();
+}
+function applyTl(){
+  if (!inPlayer || !vid.src) return;
+  clearInterval(cdTimer); $("cd").style.display = "none"; driftF = null;
+  const n = nowSrv();
+  if (n == null){ $("status").textContent = "Syncing clock…"; return; }
+  $("status").textContent = "";
+  if (tl.state === "playing"){
+    if (n < tl.startAt){
+      prog(()=>{ vid.pause(); vid.playbackRate = 1; vid.currentTime = tl.pos/1000; });
+      cdTimer = setInterval(() => {
+        const r = tl.startAt - nowSrv();
+        if (tl.state !== "playing" || r <= 0){ clearInterval(cdTimer); $("cd").style.display = "none"; if (tl.state === "playing") applyTl(); return; }
+        $("cd").textContent = Math.ceil(r/1000); $("cd").style.display = "flex";
+      }, 80);
+    } else {
+      prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; vid.play().catch(()=>pop("Tap ▶ once to allow playback")); });
+    }
+  } else if (tl.state === "paused"){
+    prog(()=>{ vid.pause(); vid.playbackRate = 1; vid.currentTime = tl.pos/1000; });
+    $("status").textContent = canControl() ? "" : "Paused by host";
+  } else {
+    prog(()=>{ vid.pause(); vid.currentTime = 0; });
+  }
+  renderPlayerUi();
+}
+function renderPlayerUi(){
+  $("pp").textContent = tl.state === "playing" ? "⏸" : "▶";
+  $("seek").disabled = !canControl();
+  for (const id of ["pp","b10","f10"]) $(id).style.opacity = canControl() ? 1 : .45;
+}
+
+/* drift correction (same idea as the Android app): seek if far off, otherwise nudge speed up to ±2% */
+setInterval(() => {
+  if (!inPlayer || tl.state !== "playing" || vid.paused) return;
+  const n = nowSrv(); if (n == null || n < tl.startAt) return;
+  if (vid.readyState < 3){ driftF = null; $("status").textContent = "Buffering…"; return; }
+  const raw = expectedMs() - vid.currentTime*1000;               // + = we are behind
+  driftF = driftF == null ? raw : driftF + 0.3*(raw - driftF);
+  const a = Math.abs(driftF), now = performance.now();
+  if (a > 1200){
+    if (now - lastSeekAt > 8000){ lastSeekAt = now; prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; }); driftF = null; }
+  } else if (a >= 300){
+    vid.playbackRate = tl.rate + Math.max(-0.01, Math.min(0.01, driftF/8000));
+  } else if (Math.abs(vid.playbackRate - tl.rate) > 0.0005){
+    vid.playbackRate = tl.rate;
+  }
+  if ($("status").textContent === "Buffering…") $("status").textContent = "";
+}, 500);
+
+/* audio track (dub) switcher - works where the browser exposes audioTracks (Safari/iPhone); Chrome Android does not */
+$("audBtn").onclick = () => {
+  const t = vid.audioTracks;
+  if (!t || t.length < 2){ pop(t ? "This file has only one audio track" : "This browser can't switch audio. Use a separate file per language."); return; }
+  let cur = 0; for (let i = 0; i < t.length; i++) if (t[i].enabled) cur = i;
+  const nx = (cur + 1) % t.length;
+  for (let i = 0; i < t.length; i++) t[i].enabled = (i === nx);
+  pop("Audio: " + (t[nx].label || t[nx].language || ("Track " + (nx + 1))));
+  showUi();
+};
+/* controls */
+$("pp").onclick = () => { tl.state === "playing" ? sendCmd("pause") : sendCmd("play", expectedMs()); showUi(); };
+$("b10").onclick = () => { sendCmd("seek", expectedMs() - 10000); showUi(); };
+$("f10").onclick = () => { sendCmd("seek", expectedMs() + 10000); showUi(); };
+const seek = $("seek");
+seek.addEventListener("input", () => { dragging = true; $("tNow").textContent = fmt(seek.value/1000*(vid.duration||0)*1000); });
+seek.addEventListener("change", () => { dragging = false; sendCmd("seek", seek.value/1000*(vid.duration||0)*1000); });
+
+/* iPhone fullscreen uses native controls: treat those as commands, or re-sync if not allowed */
+function nativeEvent(){
+  if (!inPlayer || Date.now() - lastProg < 900) return;
+  if (!canControl()){ applyTl(); return; }
+  if (vid.paused && tl.state === "playing") sendCmd("pause");
+  else if (!vid.paused && tl.state !== "playing") sendCmd("play", vid.currentTime*1000);
+}
+vid.addEventListener("play", nativeEvent);
+vid.addEventListener("pause", nativeEvent);
+vid.addEventListener("seeked", () => {
+  if (!inPlayer || Date.now() - lastProg < 900) return;
+  if (!canControl()) applyTl(); else if (Math.abs(vid.currentTime*1000 - expectedMs()) > 1500) sendCmd("seek", vid.currentTime*1000);
+});
+
+setInterval(() => {
+  if (!inPlayer || dragging) return;
+  const d = vid.duration || 0;
+  $("tNow").textContent = fmt(vid.currentTime*1000); $("tDur").textContent = fmt(d*1000);
+  if (d) seek.value = Math.round(vid.currentTime/d*1000);
+}, 300);
+
+function showUi(){
+  $("ui").classList.remove("hide"); clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { if (!dragging) $("ui").classList.add("hide"); }, 4000);
+}
+$("player").addEventListener("click", e => {
+  if (e.target.closest("button,input")) { showUi(); return; }
+  $("ui").classList.contains("hide") ? showUi() : $("ui").classList.add("hide");
+});
+$("fs").onclick = () => {
+  const c = document.documentElement;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(()=>{}); return; }
+  if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
+  else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();     // iPhone Safari
+};
+$("back").onclick = closePlayer;
+
+/* ================= live streaming (WebRTC, signalling through Firebase at rooms/<code>/rtc) =================
+   Host (needs Chrome on Android): vid.captureStream() -> one RTCPeerConnection per viewer.
+   Viewer (any browser, incl. iPhone Safari): just plays the incoming stream, no movie file needed.
+   NOTE: direct phone-to-phone connections fail on some mobile networks. If that happens, add a TURN server below. */
+const ICE = {iceServers:[{urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}
+  ,{urls:"stun:stun.relay.metered.ca:80"}
+  ,{urls:"turn:global.relay.metered.ca:80", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turn:global.relay.metered.ca:80?transport=tcp", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turn:global.relay.metered.ca:443", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turns:global.relay.metered.ca:443?transport=tcp", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"} ]};
+const QUAL = {low:{bps:500000, h:360}, med:{bps:1200000, h:480}, high:{bps:2500000, h:720}};
+let hostPeers = {}, capStream = null, lastQ = null;
+let vp = null, streamWanted = false, wakeLock = null;
+
+async function keepAwake(on){
+  try{
+    if (on && navigator.wakeLock && !wakeLock){ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", ()=>wakeLock=null); }
+    else if (!on && wakeLock){ await wakeLock.release(); wakeLock = null; }
+  }catch(e){}
+}
+const canCapture = () => !!(vid.captureStream || vid.mozCaptureStream);
+function getCapStream(){
+  if (capStream && capStream.getTracks().length) return capStream;
+  try{ capStream = vid.captureStream ? vid.captureStream() : (vid.mozCaptureStream ? vid.mozCaptureStream() : null); }
+  catch(ex){ capStream = null; pop("Stream error: " + ex.message); }
+  return capStream;
+}
+function candJson(c){ return {c:c.candidate, m:c.sdpMid, i:c.sdpMLineIndex}; }
+function feedCandidates(peer, obj){
+  if (!obj || !peer || !peer.pc) return;
+  for (const [k,c] of Object.entries(obj)){
+    if (!c || peer.seen.has(k)) continue; peer.seen.add(k);
+    const cand = {candidate:c.c, sdpMid:c.m, sdpMLineIndex:c.i};
+    if (peer.remoteSet) peer.pc.addIceCandidate(cand).catch(()=>{}); else peer.q.push(cand);
+  }
+}
+function flushCandidates(peer){ peer.q.splice(0).forEach(c => peer.pc.addIceCandidate(c).catch(()=>{})); }
+
+/* ---- host side ---- */
+function applyQuality(pc){
+  const q = QUAL[(room.stream && room.stream.q) || "med"] || QUAL.med;
+  pc.getSenders().forEach(s => {
+    if (!s.track || s.track.kind !== "video") return;
+    try{
+      const p = s.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = q.bps;
+      p.encodings[0].scaleResolutionDownBy = Math.max(1, (vid.videoHeight || q.h) / q.h);
+      p.degradationPreference = "maintain-framerate";
+      s.setParameters(p).catch(()=>{});
+    }catch(e){}
+  });
+}
+function closeHostPeers(){
+  Object.values(hostPeers).forEach(h => { try{ h.pc && h.pc.close(); }catch(e){} });
+  hostPeers = {};
+}
+async function startHostPeer(viewerId, want){
+  const old = hostPeers[viewerId]; if (old && old.pc) { try{ old.pc.close(); }catch(e){} }
+  const cs = getCapStream();
+  if (!cs || !cs.getTracks().length){ hostPeers[viewerId] = {pc:null, want:null}; setTimeout(processStream, 1000); return; }
+  let pc; try{ pc = new RTCPeerConnection(ICE); }catch(ex){ pop("Stream error: " + ex.message); return; }
+  const hp = {pc, want, seen:new Set(), q:[], remoteSet:false, offerSdp:null};
+  hostPeers[viewerId] = hp;
+  cs.getTracks().forEach(t => { if (t.kind === "video") t.contentHint = "motion"; pc.addTrack(t, cs); });
+  pc.onicecandidate = e => { if (e.candidate) write("POST", `rooms/${code}/rtc/${viewerId}/hc`, candJson(e.candidate)); };
+  pc.onconnectionstatechange = () => updateStreamInfo();
+  applyQuality(pc);
+  try{
+    await write("PATCH", `rooms/${code}/rtc/${viewerId}`, {offer:null, answer:null, hc:null, vc:null});
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    applyQuality(pc);
+    hp.offerSdp = pc.localDescription.sdp;
+    write("PUT", `rooms/${code}/rtc/${viewerId}/offer`, hp.offerSdp);
+  }catch(e){ pop("Stream error: " + e.message); }
+}
+function startStreaming(){
+  if (!canCapture()) return pop("This browser can't stream. Use Chrome on Android.");
+  if (!fileMeta) return pop("Choose your movie file first");
+  write("PUT", `rooms/${code}/stream`, {on:true, q:$("qual").value});
+  keepAwake(true);
+}
+function stopStreaming(){
+  write("DELETE", `rooms/${code}/stream`);
+  write("DELETE", `rooms/${code}/rtc`);
+  closeHostPeers(); keepAwake(false); updateStreamInfo();
+}
+function updateStreamInfo(){
+  if (!code || !isHost()) return;
+  const on = room.stream && room.stream.on;
+  const n = Object.values(hostPeers).filter(h => h.pc && h.pc.connectionState === "connected").length;
+  $("streamInfo").textContent = !canCapture() ? "This browser can't stream. Use Chrome on Android."
+    : !fileMeta ? "Choose your movie file first."
+    : on ? `Streaming to ${n} viewer${n === 1 ? "" : "s"}. Open the player and press play. Keep this screen on.`
+    : "Others can watch without the movie file. Needs good upload speed on your side.";
+}
+
+/* ---- viewer side ---- */
+function closeViewerPeer(){
+  if (vp && vp.pc){ try{ vp.pc.close(); }catch(e){} }
+  vp = null;
+  const rv = $("rv"); rv.srcObject = null;
+}
+function watchStream(){
+  if (!code || isHost()) return;
+  streamWanted = true;
+  $("viewer").classList.add("on"); $("tap").style.display = "none";
+  $("vstatus").textContent = "Connecting to host…";
+  closeViewerPeer();
+  keepAwake(true);
+  write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:1, diff:0, viaStream:true});
+  write("PATCH", `rooms/${code}/rtc/${myId}`, {want:Date.now(), offer:null, answer:null, hc:null, vc:null});
+}
+function stopWatching(){
+  streamWanted = false; closeViewerPeer(); keepAwake(false);
+  $("viewer").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  write("DELETE", `rooms/${code}/rtc/${myId}`);
+  write("PATCH", `rooms/${code}/people/${myId}`, {verified:false, ready:false, viaStream:null});
+  sentKey = null; ensureVerified();
+}
+async function startViewerPeer(offerSdp){
+  closeViewerPeer();
+  const pc = new RTCPeerConnection(ICE);
+  const me = {pc, offer:offerSdp, seen:new Set(), q:[], remoteSet:false};
+  vp = me;
+  pc.onicecandidate = e => { if (e.candidate) write("POST", `rooms/${code}/rtc/${myId}/vc`, candJson(e.candidate)); };
+  pc.ontrack = e => {
+    const rv = $("rv");
+    if (rv.srcObject !== e.streams[0]) rv.srcObject = e.streams[0];
+    rv.play().then(() => $("tap").style.display = "none").catch(() => $("tap").style.display = "block");
+  };
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    $("vstatus").textContent = s === "connected" ? "● Live" : s === "disconnected" ? "Connection unstable… reconnecting"
+      : s === "failed" ? "Could not connect directly. Tap ↻ to retry (some mobile networks block direct connections)." : "Connecting…";
+  };
+  try{
+    await pc.setRemoteDescription({type:"offer", sdp:offerSdp});
+    me.remoteSet = true; flushCandidates(me);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    write("PUT", `rooms/${code}/rtc/${myId}/answer`, pc.localDescription.sdp);
+    const n = room.rtc && room.rtc[myId]; feedCandidates(me, n && n.hc);
+  }catch(e){ $("vstatus").textContent = "Stream error: " + e.message; }
+}
+
+/* ---- called on every room change ---- */
+function processStream(){
+  if (!code) return;
+  const rtc = room.rtc || {};
+  if (isHost()){
+    if (fileMeta && room.mode === "stream" && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
+      autoStreamKey = fileLabel + fileMeta.size;     // streaming is offered as soon as the host's file is ready
+      startStreaming();
+    }
+    if (room.stream && room.stream.q && room.stream.q !== lastQ){
+      lastQ = room.stream.q;
+      Object.values(hostPeers).forEach(h => h.pc && applyQuality(h.pc));
+    }
+    if (room.stream && room.stream.on && fileMeta){
+      for (const [vId, node] of Object.entries(rtc)){
+        if (!node || !room.people || !room.people[vId]) continue;
+        const hp = hostPeers[vId];
+        if (node.want && (!hp || hp.want !== node.want)){ startHostPeer(vId, node.want); continue; }
+        if (hp && hp.pc){
+          if (node.answer && !hp.remoteSet && hp.offerSdp && node.offer === hp.offerSdp){
+            hp.remoteSet = true;
+            hp.pc.setRemoteDescription({type:"answer", sdp:node.answer}).then(() => flushCandidates(hp)).catch(() => { hp.remoteSet = false; });
+          }
+          feedCandidates(hp, node.vc);
+        }
+      }
+    }
+    for (const vId of Object.keys(hostPeers)){
+      if (!room.people || !room.people[vId]){ try{ hostPeers[vId].pc && hostPeers[vId].pc.close(); }catch(e){} delete hostPeers[vId]; }
+    }
+    updateStreamInfo();
+  } else if (streamWanted){
+    if (!(room.stream && room.stream.on)){
+      $("vstatus").textContent = "Host stopped streaming";
+      streamWanted = false; closeViewerPeer();
+      return;
+    }
+    const node = rtc[myId];
+    if (node && node.offer && (!vp || vp.offer !== node.offer)) startViewerPeer(node.offer);
+    else if (vp && node) feedCandidates(vp, node.hc);
+  }
+}
+function renderStreamCard(){
+  const card = $("streamCard"), on = !!(room.stream && room.stream.on);
+  /* stream rooms: guests only watch, so hide the file picker + sync button for them */
+  const sr = room.mode === "stream";
+  $("file").closest(".card").style.display = (sr && !isHost()) ? "none" : "block";
+  if (sr){
+    if (isHost()){
+      $("main").style.display = "block"; $("main").textContent = "Open player"; $("main").disabled = !fileMeta;
+      $("roomMsg").textContent = !fileMeta ? "Choose your movie file to start streaming" : on ? "Streaming. Open the player and press play." : "Starting the stream…";
+    } else {
+      $("main").style.display = "none";
+      $("roomMsg").textContent = on ? "The host is streaming. Tap Watch live stream below." : "Waiting for the host to start streaming…";
+    }
+  } else $("main").style.display = "block";
+  if (isHost() && !sr && !on){
+    card.style.display = "none";            // normal rooms: no streaming controls unless a stream is already running
+  } else if (isHost()){
+    card.style.display = "block"; $("streamHost").style.display = "block"; $("streamGuest").style.display = "none";
+    $("streamBtn").disabled = !fileMeta || !canCapture();
+    $("streamBtn").textContent = on ? "Stop streaming" : "Start streaming";
+    if (on && room.stream.q) $("qual").value = room.stream.q;
+    updateStreamInfo();
+  } else if (on && people.some(p => p.host && p.online)){
+    card.style.display = "block"; $("streamHost").style.display = "none"; $("streamGuest").style.display = "block";
+  } else card.style.display = "none";
+}
+$("streamBtn").onclick = () => (room.stream && room.stream.on) ? stopStreaming() : startStreaming();
+$("qual").onchange = () => { if (code && isHost() && room.stream && room.stream.on) write("PATCH", `rooms/${code}/stream`, {q:$("qual").value}); };
+$("watchBtn").onclick = watchStream;
+$("vback").onclick = stopWatching;
+$("vretry").onclick = watchStream;
+$("tap").onclick = () => $("rv").play().then(() => $("tap").style.display = "none").catch(()=>{});
+$("vfs").onclick = () => {
+  const rv = $("rv"), c = document.documentElement;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(()=>{}); return; }
+  if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
+  else if (rv.webkitEnterFullscreen) rv.webkitEnterFullscreen();
+};
+
+/* ================= chat (messages live at rooms/<code>/chat, newest last) ================= */
+let autoStreamKey = null, chatOpen = false, chatSeen = new Set(), chatReady = false, unread = 0;
+const chatList = () => Object.entries(room.chat || {}).filter(([k,m]) => m && m.m).sort((a,b) => a[0] < b[0] ? -1 : 1).slice(-80);
+function setBadge(){ for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).textContent = unread ? "💬 " + unread : "💬" + (id === "chatBtnL" ? " Chat" : ""); }
+function renderChatLog(list){
+  const log = $("chatLog"); log.innerHTML = "";
+  for (const [k,m] of list){
+    const d = document.createElement("div"); d.className = "cm";
+    const b = document.createElement("b"); b.textContent = (m.i === myId ? "You" : (m.n || "Guest")) + ": ";
+    if (m.i === myId) b.style.color = "#8fd4ff";
+    d.appendChild(b); d.appendChild(document.createTextNode(m.m)); log.appendChild(d);
+  }
+  log.scrollTop = log.scrollHeight;
+}
+function chatUpdate(){
+  if (!code) return;
+  const list = chatList();
+  for (const [k,m] of list){
+    if (chatSeen.has(k)) continue; chatSeen.add(k);
+    if (chatReady && m.i !== myId && !chatOpen){ unread++; pop((m.n || "Guest") + ": " + m.m.slice(0, 60)); }
+  }
+  chatReady = true;
+  if (chatOpen){ unread = 0; renderChatLog(list); }
+  setBadge();
+}
+function toggleChat(open){
+  chatOpen = open === undefined ? !chatOpen : open;
+  $("chat").classList.toggle("on", chatOpen);
+  if (chatOpen){ unread = 0; renderChatLog(chatList()); setBadge(); }
+}
+$("chatForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = $("chatIn").value.trim().slice(0, 300);
+  if (!t || !code) return;
+  $("chatIn").value = "";
+  write("POST", `rooms/${code}/chat`, {n:nick || "Guest", i:myId, m:t, t:SV});
+});
+for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).onclick = e => { e.stopPropagation(); toggleChat(); };
+$("chatClose").onclick = () => toggleChat(false);
+
+/* show any unexpected error on screen instead of failing silently */
+window.addEventListener("error", e => { try{ pop("Error: " + (e.message || "unknown")); }catch(_){} });
+window.addEventListener("unhandledrejection", e => { try{ pop("Error: " + ((e.reason && e.reason.message) || e.reason || "unknown")); }catch(_){} });
+
+/* ================= buttons ================= */
+$("create").onclick = () => createRoom("sync");
+$("createStream").onclick = () => createRoom("stream");
+$("join").onclick = joinRoom;
+$("leave").onclick = () => { if (confirm(isHost() ? "End this room for everyone?" : "Leave the room?")) leaveRoom(); };
+$("ctlAll").onclick = () => write("PUT", `rooms/${code}/controlAll`, !controlAll);
+$("invite").onclick = async () => {
+  const link = location.origin + location.pathname + "#" + code;
+  const text = `Join my Watch Party!\nRoom code: ${code}\n${link}`;
+  try { if (navigator.share) await navigator.share({text}); else { await navigator.clipboard.writeText(text); pop("Copied"); } } catch(e){}
+};
+$("nick").addEventListener("change", saveNick);
+if (/^#\d{6}$/.test(location.hash)) $("codeIn").value = location.hash.slice(1);
+
+/* rejoin the room after a page reload */
+(async function resume(){
+  try{
+    const sv = JSON.parse(localStorage.wp_room || "null");
+    if (!sv || !nick || Date.now() - sv.t > 6*3600*1000) return;
+    const host = await getJson(`rooms/${sv.c}/hostId`);
+    if (!host){ localStorage.removeItem("wp_room"); return; }
+    const me = await getJson(`rooms/${sv.c}/people/${sv.id}`);
+    if (!me) await write("PUT", `rooms/${sv.c}/people/${sv.id}`, {name:nick, verified:false, ready:false, seen:SV});
+    enterRoom(sv.c, sv.id);
+    pop("Rejoined your room - choose the movie file again if you need it");
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
