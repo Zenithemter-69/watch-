@@ -157,6 +157,7 @@
     <div class="top">
       <button class="chip sec" id="back">‹ Back</button>
       <div class="t" id="title"></div>
+      <button class="chip sec" id="audBtn">🔊</button>
       <button class="chip sec" id="chatBtnP">💬</button>
       <div class="chip" id="ppl">👥 1</div>
     </div>
@@ -627,6 +628,16 @@ setInterval(() => {
   if ($("status").textContent === "Buffering…") $("status").textContent = "";
 }, 500);
 
+/* audio track (dub) switcher - works where the browser exposes audioTracks (Safari/iPhone); Chrome Android does not */
+$("audBtn").onclick = () => {
+  const t = vid.audioTracks;
+  if (!t || t.length < 2){ pop(t ? "This file has only one audio track" : "This browser can't switch audio. Use a separate file per language."); return; }
+  let cur = 0; for (let i = 0; i < t.length; i++) if (t[i].enabled) cur = i;
+  const nx = (cur + 1) % t.length;
+  for (let i = 0; i < t.length; i++) t[i].enabled = (i === nx);
+  pop("Audio: " + (t[nx].label || t[nx].language || ("Track " + (nx + 1))));
+  showUi();
+};
 /* controls */
 $("pp").onclick = () => { tl.state === "playing" ? sendCmd("pause") : sendCmd("play", expectedMs()); showUi(); };
 $("b10").onclick = () => { sendCmd("seek", expectedMs() - 10000); showUi(); };
@@ -676,7 +687,11 @@ $("back").onclick = closePlayer;
    Viewer (any browser, incl. iPhone Safari): just plays the incoming stream, no movie file needed.
    NOTE: direct phone-to-phone connections fail on some mobile networks. If that happens, add a TURN server below. */
 const ICE = {iceServers:[{urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}
-  /* , {urls:"turn:YOUR_TURN_HOST:3478", username:"USER", credential:"PASS"} */ ]};
+  ,{urls:"stun:stun.relay.metered.ca:80"}
+  ,{urls:"turn:global.relay.metered.ca:80", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turn:global.relay.metered.ca:80?transport=tcp", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turn:global.relay.metered.ca:443", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"}
+  ,{urls:"turns:global.relay.metered.ca:443?transport=tcp", username:"2d78de56f627c6ca80aea403", credential:"W2lKhLw+XtFXapq9"} ]};
 const QUAL = {low:{bps:500000, h:360}, med:{bps:1200000, h:480}, high:{bps:2500000, h:720}};
 let hostPeers = {}, capStream = null, lastQ = null;
 let vp = null, streamWanted = false, wakeLock = null;
