@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WatchParty">
+<title>WatchParty</title>
+<style>
+  :root{--accent:#2BD67B;--card:#1B1B1F;--bg:#0E0E10;--txt:#f2f2f2;--mute:#9a9aa2;--warn:#FFB74D}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif}
+  .screen{display:none;min-height:100%;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
+  .screen.on{display:block}
+  h1{margin:8px 0 4px;font-size:26px}
+  p.sub{margin:0 0 18px;color:var(--mute);font-size:14px}
+  .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--mute);margin:0 0 6px}
+  input[type=text],input[type=tel]{width:100%;padding:13px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:17px}
+  button{font:inherit;border:0;border-radius:12px;padding:14px 16px;font-size:16px;font-weight:600;color:#06140c;background:var(--accent);width:100%}
+  button.sec{background:#2a2a2e;color:var(--txt)}
+  button.red{background:transparent;color:#ff6b6b}
+  button:disabled{opacity:.4}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  .code{font-size:34px;letter-spacing:6px;text-align:center;font-weight:800;color:var(--accent);margin:6px 0}
+  .who{font-size:13px;color:var(--mute);margin-top:8px;line-height:1.4}
+  .filebtn{display:block;text-align:center;background:#2a2a2e;border-radius:12px;padding:14px;font-weight:600;font-size:16px}
+  .filebtn input{display:none}
+  .msg{color:var(--warn);font-size:13px;min-height:18px;margin:6px 0}
+  .person{display:flex;align-items:center;gap:10px;background:#121214;border-radius:12px;padding:10px 12px;margin-bottom:6px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#666;flex:none}
+  .person .n{font-size:15px}.person .s{font-size:12px;color:var(--mute)}
+  .person .ctl{margin-left:auto;font-size:13px;color:var(--mute);width:auto;background:none;padding:6px 8px}
+  .person .ctl.on{color:var(--accent)}
+  /* player */
+  #player{position:fixed;inset:0;background:#000;display:none;z-index:5}
+  #player.on{display:block}
+  video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+  #cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;text-shadow:0 0 20px #000;pointer-events:none}
+  #ui{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(#000a,#0000 25%,#0000 65%,#000c)}
+  #ui.hide{opacity:0;pointer-events:none}
+  .top,.bot{display:flex;align-items:center;gap:10px}
+  .top .t{flex:1;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip{background:#000a;border-radius:20px;padding:8px 12px;font-size:13px;width:auto}
+  .mid{display:flex;justify-content:center;align-items:center;gap:28px}
+  .rb{width:64px;height:64px;border-radius:50%;background:#000a;color:#fff;font-size:15px;padding:0}
+  .rb.big{width:84px;height:84px;font-size:34px;background:var(--accent);color:#06140c}
+  input[type=range]{flex:1;accent-color:var(--accent);height:30px}
+  .tm{font-size:12px;font-variant-numeric:tabular-nums;color:#ddd;min-width:44px;text-align:center}
+  #pop{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:#2a2a2eEE;padding:8px 16px;border-radius:20px;font-size:13px;display:none;max-width:90%;text-align:center;z-index:9}
+  #status{position:absolute;bottom:92px;left:0;right:0;text-align:center;font-size:12px;color:#ddd;pointer-events:none}
+  #lpop{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2a2a2e;padding:8px 16px;border-radius:20px;font-size:13px;display:none;z-index:9}
+</style>
+</head>
+<body>
+
+<div id="lpop"></div>
+
+<!-- HOME -->
+<div id="home" class="screen on">
+  <h1>🎬 WatchParty</h1>
+  <p class="sub">Watch the same movie together, in sync. Works with the Android app and on iPhone.</p>
+  <div class="card">
+    <label>Your nickname</label>
+    <input id="nick" type="text" maxlength="20" placeholder="e.g. Nis" autocomplete="off">
+  </div>
+  <div class="card"><button id="create">Create room</button></div>
+  <div class="card">
+    <label>Or join with a 6-digit code</label>
+    <div class="row">
+      <input id="codeIn" type="tel" maxlength="6" placeholder="123456" inputmode="numeric" style="flex:2">
+      <button id="join" style="flex:1">Join</button>
+    </div>
+  </div>
+  <div class="msg" id="err"></div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobby" class="screen">
+  <h1>Room</h1>
+  <div class="card">
+    <label>Room code</label>
+    <div class="code" id="roomCode">------</div>
+    <button class="sec" id="invite">Share invite</button>
+  </div>
+
+  <div class="card">
+    <label>Watching</label>
+    <div id="people"></div>
+    <button class="sec" id="ctlAll" style="display:none;margin-top:6px;font-size:14px">Give control to everyone</button>
+  </div>
+
+  <div class="card">
+    <label>Your copy of the movie (must be the same movie as the host)</label>
+    <div class="who" id="hostMovie" style="margin:0 0 8px"></div>
+    <label class="filebtn">📁 Choose movie file
+      <input id="file" type="file" accept="video/*">
+    </label>
+    <div class="who" id="fileName">No file chosen</div>
+    <div class="who" id="fileHint"></div>
+  </div>
+
+  <div class="msg" id="roomMsg"></div>
+  <div class="card"><button id="main" disabled>Start</button></div>
+  <button class="red" id="leave">Leave room</button>
+</div>
+
+<!-- PLAYER -->
+<div id="player">
+  <video id="vid" playsinline webkit-playsinline preload="auto"></video>
+  <div id="cd"></div>
+  <div id="status"></div>
+  <div id="pop"></div>
+  <div id="ui">
+    <div class="top">
+      <button class="chip sec" id="back">‹ Back</button>
+      <div class="t" id="title"></div>
+      <div class="chip" id="ppl">👥 1</div>
+    </div>
+    <div class="mid">
+      <button class="rb" id="b10">−10s</button>
+      <button class="rb big" id="pp">▶</button>
+      <button class="rb" id="f10">+10s</button>
+    </div>
+    <div class="bot">
+      <div class="tm" id="tNow">0:00</div>
+      <input type="range" id="seek" min="0" max="1000" value="0">
+      <div class="tm" id="tDur">0:00</div>
+      <button class="chip sec" id="fs">⛶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= config (same Firebase + same data layout as the Android app) ================= */
+const DB = "https://study-app-fff47-default-rtdb.firebaseio.com";
+const START_LEAD = 3000, RESUME_LEAD = 1500, ONLINE_WINDOW = 25000;
+const SV = {".sv":"timestamp"};
+const $ = id => document.getElementById(id);
+const url = p => `${DB}/${p}.json`;
+
+/* ================= state ================= */
+let nick = localStorage.wp_nick || "";
+let code = null, myId = null, room = {}, es = null;
+let fileUrl = null, fileLabel = "", fileMeta = null;     // fileMeta = {durMs,w,h,size}
+let sentKey = null, matchLevel = 1, matchDiff = 0;
+let offset = null, samples = [];                          // clock: serverNow = performance.now()+offset
+let tlSig = "", tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
+let controlAll = false, controllers = new Set();
+let inPlayer = false, dragging = false, lastProg = 0, hideTimer = null, cdTimer = null;
+let driftF = null, lastSeekAt = 0, timers = [];
+$("nick").value = nick;
+
+/* ================= small helpers ================= */
+const saveNick = () => { nick = $("nick").value.trim().slice(0,20); localStorage.wp_nick = nick; };
+const err = m => $("err").textContent = m || "";
+const fmt = ms => { let s = Math.max(0, ms/1000|0); const h = s/3600|0, m = (s%3600)/60|0, x = s%60; return (h ? h+":"+String(m).padStart(2,"0") : m)+":"+String(x).padStart(2,"0"); };
+const nowSrv = () => offset == null ? null : performance.now() + offset;
+const newId = () => "u" + Array.from(crypto.getRandomValues(new Uint8Array(5))).map(b=>b.toString(16).padStart(2,"0")).join("");
+const isHost = () => code && myId && room.hostId === myId;
+const started = () => tl.state !== "stopped";
+const canControl = () => isHost() || controlAll || controllers.has(myId);
+function show(id){ for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === id); }
+function pop(t){
+  const el = inPlayer ? $("pop") : $("lpop");
+  el.textContent = t; el.style.display = "block"; clearTimeout(el._t); el._t = setTimeout(()=>el.style.display="none", 2400);
+}
+
+/* writes go out one after another so their order is kept */
+let wq = Promise.resolve();
+function write(method, path, body){
+  wq = wq.then(() => fetch(url(path), {method, body: body === undefined ? undefined : JSON.stringify(body)}).then(r=>r.ok)).catch(()=>false);
+  return wq;
+}
+async function getJson(path){ const r = await fetch(url(path)); if (!r.ok) throw new Error("HTTP "+r.status); return r.json(); }
+
+/* ================= clock sync against Firebase server time ================= */
+async function pingClock(){
+  if (!myId) return;
+  try{
+    const t0 = performance.now();
+    const txt = await (await fetch(url(`pings/${myId}`), {method:"PUT", body:JSON.stringify(SV)})).text();
+    const t1 = performance.now(), ts = Number(txt.trim());
+    if (!isFinite(ts)) return;
+    const rtt = t1 - t0;
+    samples.push({rtt, off: ts + rtt/2 - t1, at: t1});
+    samples = samples.filter(s => t1 - s.at < 60000).slice(-12);
+    const best = samples.reduce((a,b)=> b.rtt < a.rtt ? b : a);
+    const first = offset == null;
+    offset = best.off;
+    if (first){ if (inPlayer) applyTl(); onRoom(); }
+  }catch(e){}
+}
+function startClock(){
+  samples = []; offset = null;
+  let n = 0;
+  const loop = async () => { if (!code) return; await pingClock(); n++; timers.push(setTimeout(loop, n < 6 ? 500 : 10000)); };
+  loop();
+}
+
+/* ================= create / join ================= */
+async function createRoom(){
+  saveNick(); if (!nick) return err("Type a nickname first");
+  err("Creating room…");
+  try{
+    let c = "";
+    for (let i=0;i<8;i++){
+      const t = String(100000 + Math.floor(Math.random()*900000));
+      if ((await getJson(`rooms/${t}/hostId`)) === null){ c = t; break; }
+    }
+    if (!c) throw new Error("no free room code");
+    const id = newId();
+    const r = await fetch(url(`rooms/${c}`), {method:"PUT", body: JSON.stringify({
+      hostId:id, createdAt:SV,
+      timeline:{state:"stopped",pos:0,rate:1.0,startAt:0,seq:0},
+      people:{[id]:{name:nick,verified:false,ready:false,seen:SV}}
+    })});
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    enterRoom(c, id);
+  }catch(e){ err("Could not create the room: "+e.message); }
+}
+async function joinRoom(){
+  saveNick(); if (!nick) return err("Type a nickname first");
+  const c = $("codeIn").value.trim();
+  if (!/^\d{6}$/.test(c)) return err("Enter the 6-digit code");
+  err("Joining…");
+  try{
+    const host = await getJson(`rooms/${c}/hostId`);
+    if (!host) return err("Room not found - check the code");
+    const id = newId();
+    const r = await fetch(url(`rooms/${c}/people/${id}`), {method:"PUT", body: JSON.stringify({name:nick,verified:false,ready:false,seen:SV})});
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    enterRoom(c, id);
+  }catch(e){ err("Could not join: "+e.message); }
+}
+function enterRoom(c, id){
+  err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null;
+  tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
+  controlAll = false; controllers = new Set();
+  history.replaceState(null, "", "#"+c);
+  $("roomCode").textContent = c.slice(0,3)+" "+c.slice(3);
+  show("lobby");
+  startClock();
+  timers.push(setInterval(heartbeat, 6000));
+  openStream();
+  if (fileMeta) { sentKey = null; ensureVerified(); }
+}
+function cleanup(msg){
+  if (es) es.close(); es = null;
+  timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
+  clearInterval(cdTimer);
+  vid.pause(); inPlayer = false; $("player").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  code = null; myId = null; room = {}; offset = null; driftF = null;
+  history.replaceState(null, "", location.pathname);
+  show("home"); err(msg || "");
+}
+function leaveRoom(){
+  if (code && myId){
+    if (isHost()) write("DELETE", `rooms/${code}`);
+    else write("DELETE", `rooms/${code}/people/${myId}`);
+  }
+  cleanup("");
+}
+function heartbeat(){
+  if (code && myId && room.people && room.people[myId]) write("PUT", `rooms/${code}/people/${myId}/seen`, SV);
+  onRoom();
+}
+
+/* ================= live stream (Firebase server-sent events) ================= */
+function openStream(){
+  if (es) es.close();
+  es = new EventSource(url(`rooms/${code}`));
+  es.addEventListener("put",   e => { const d = JSON.parse(e.data); setAt(d.path, d.data); onRoom(); });
+  es.addEventListener("patch", e => {
+    const d = JSON.parse(e.data);
+    for (const k in d.data) setAt((d.path === "/" ? "" : d.path) + "/" + k, d.data[k]);
+    onRoom();
+  });
+  es.addEventListener("cancel", () => cleanup("No access - check your Firebase rules"));
+}
+function setAt(path, val){
+  const segs = path.split("/").filter(Boolean);
+  if (!segs.length){ room = (val && typeof val === "object") ? val : {}; return; }
+  let o = room;
+  for (let i=0;i<segs.length-1;i++){
+    if (o[segs[i]] == null || typeof o[segs[i]] !== "object"){ if (val == null) return; o[segs[i]] = {}; }
+    o = o[segs[i]];
+  }
+  const k = segs[segs.length-1];
+  if (val == null) delete o[k]; else o[k] = val;
+}
+
+/* ================= room changed ================= */
+let people = [], knownP = {}, knownInit = false;
+function onRoom(){
+  if (!code) return;
+  if (!room.hostId) return cleanup("Host closed the room");
+  const now = nowSrv();
+
+  // people
+  const list = [];
+  for (const [id,p] of Object.entries(room.people || {})){
+    if (!p || !p.name) continue;
+    const seen = p.seen || 0;
+    const online = now == null || !seen || now - seen < ONLINE_WINDOW;
+    list.push({id, name:p.name, host:id === room.hostId, online, verified:!!p.verified, ready:!!p.ready, match:p.match||1, diff:p.diff||0});
+  }
+  list.sort((a,b)=> (b.host-a.host) || a.name.localeCompare(b.name));
+  if (!list.some(p => p.id === myId)) return cleanup("You were removed from the room");
+  if (knownInit){
+    for (const p of list){
+      if (p.id === myId) continue;
+      const o = knownP[p.id];
+      if (!o && p.online) pop(p.name+" joined");
+      else if (o && o.online && !p.online) pop(p.name+" left");
+      else if (o && !o.online && p.online) pop(p.name+" is back");
+    }
+  }
+  knownP = {}; list.forEach(p => knownP[p.id] = p); knownInit = true; people = list;
+
+  // control rights
+  const hadControl = canControl();
+  controlAll = room.controlAll === true || room.controlAll === "true";
+  controllers = new Set(Object.entries(room.controllers || {}).filter(([k,v]) => v === true || v === "true").map(([k]) => k));
+  if (!isHost() && inPlayer){
+    if (!hadControl && canControl()) pop("You can now control playback");
+    else if (hadControl && !canControl()) pop("Playback control removed");
+  }
+
+  // timeline
+  const t = room.timeline;
+  if (t){
+    const sig = [t.seq,t.state,t.pos,t.startAt].join("|");
+    if (sig !== tlSig){
+      tlSig = sig;
+      tl = {state:t.state, pos:+t.pos||0, startAt:+t.startAt||0, rate:+t.rate||1, seq:+t.seq||0};
+      if (inPlayer) applyTl();
+    }
+  }
+  ensureVerified();
+  renderLobby();
+}
+
+/* ================= file + verification ================= */
+$("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (fileUrl) URL.revokeObjectURL(fileUrl);
+  fileUrl = URL.createObjectURL(f);
+  fileLabel = f.name; fileMeta = null; sentKey = null;
+  $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  $("fileHint").textContent = isIOS && /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? "⚠ iPhone can't play this format. Use an .mp4 / .mov (H.264)." : "Reading movie length…";
+  if (code && myId) write("PATCH", `rooms/${code}/people/${myId}`, {verified:false, ready:false});
+  const size = f.size;
+  vid.onloadedmetadata = () => {
+    fileMeta = {durMs: Math.round(vid.duration*1000), w: vid.videoWidth, h: vid.videoHeight, size};
+    if (!/⚠/.test($("fileHint").textContent)) $("fileHint").textContent = "Length " + fmt(fileMeta.durMs);
+    ensureVerified(); renderLobby();
+  };
+  vid.onerror = () => { $("fileHint").textContent = "⚠ This phone can't play that file. Try an .mp4 (H.264)."; };
+  vid.src = fileUrl;
+  renderLobby();
+});
+
+/* Same rules as the Android app: host's file is the reference; guests compare by length.
+   (A browser can't hash a multi-GB file, so identical-hash matches are never claimed here.) */
+function ensureVerified(){
+  if (!code || !myId || !fileMeta) return;
+  const mv = room.movie;
+  if (isHost()){
+    const key = "h:" + fileLabel + ":" + fileMeta.size;
+    if (sentKey === key) return; sentKey = key;
+    write("PUT", `rooms/${code}/movie`, {hash:"web-"+fileMeta.size, size:fileMeta.size, name:fileLabel, dur:fileMeta.durMs, w:fileMeta.w, h:fileMeta.h});
+    write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:1, diff:0});
+    matchLevel = 1; matchDiff = 0;
+  } else if (mv){
+    const hostDur = +mv.dur || 0, known = hostDur > 0 && fileMeta.durMs > 0;
+    const diff = known ? fileMeta.durMs - hostDur : 0;
+    const level = known && Math.abs(diff) <= 1000 ? 2 : 3;
+    const key = `g:${level}:${diff}:${mv.name}:${fileMeta.size}`;
+    if (sentKey === key) return; sentKey = key;
+    matchLevel = level; matchDiff = diff;
+    write("PATCH", `rooms/${code}/people/${myId}`, {verified:true, ready:true, match:level, diff:known ? diff : 0});
+  }
+}
+
+/* ================= lobby UI ================= */
+function personStatus(p){
+  if (!p.online) return "Offline";
+  const suffix = !p.verified ? "" : p.match === 2 ? " · different file, same length" : p.match === 3 ? " · ⚠ length differs" : "";
+  if (started()) return "Watching" + suffix;
+  if (p.ready) return "Ready" + suffix;
+  return p.verified ? "Movie verified" + suffix : "Choose the movie file…";
+}
+function renderLobby(){
+  if (!code) return;
+  const box = $("people"); box.innerHTML = "";
+  for (const p of people){
+    const row = document.createElement("div"); row.className = "person";
+    const col = p.online ? ((p.ready || started()) ? "var(--accent)" : "var(--warn)") : "#666";
+    row.innerHTML = `<div class="dot" style="background:${col}"></div><div><div class="n"></div><div class="s"></div></div>`;
+    row.querySelector(".n").textContent = p.name + (p.host ? "  ·  host" : "") + (p.id === myId ? "  (you)" : "");
+    row.querySelector(".s").textContent = personStatus(p);
+    if (isHost() && p.id !== myId){
+      const b = document.createElement("button"); const has = controllers.has(p.id);
+      b.className = "ctl" + (has ? " on" : ""); b.textContent = has ? "Control ✓" : "Give control";
+      b.onclick = () => has ? write("DELETE", `rooms/${code}/controllers/${p.id}`) : write("PUT", `rooms/${code}/controllers/${p.id}`, true);
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
+  $("ctlAll").style.display = isHost() ? "block" : "none";
+  $("ctlAll").textContent = controlAll ? "✓ Everyone can control (tap to stop)" : "Give control to everyone";
+  $("leave").textContent = isHost() ? "End room" : "Leave room";
+
+  const mv = room.movie;
+  $("hostMovie").textContent = (!isHost() && mv) ? `Host is using: ${mv.name}` + (mv.size ? ` (${(mv.size/1048576).toFixed(0)} MB)` : "") : "";
+
+  // main button + message
+  const online = people.filter(p => p.online);
+  const allReady = !!mv && online.length > 0 && online.every(p => p.verified && p.ready);
+  const hostOffline = people.some(p => p.host && !p.online);
+  const b = $("main"), msg = $("roomMsg");
+  let m = "";
+  if (!fileMeta) m = isHost() ? "Choose your movie file to continue" : "Choose the same movie file as the host";
+  else if (!isHost() && !mv) m = "Waiting for the host to pick a movie…";
+  else if (hostOffline) m = "Host disconnected - waiting for them to return";
+  else if (!isHost() && matchLevel === 3) m = "⚠ Your file's length is different from the host's (" + fmt(Math.abs(matchDiff)) + (matchDiff > 0 ? " longer" : " shorter") + "). Positions may not line up.";
+  else if (started()) m = "";
+  else m = allReady ? "Everyone is ready" : "Waiting for everyone to be ready";
+  msg.textContent = m;
+
+  if (isHost()){
+    b.textContent = started() ? "Open player" : (allReady ? "Start" : "Start (waiting for everyone)");
+    b.disabled = !fileMeta || (!started() && !allReady);
+  } else {
+    b.textContent = started() ? "▶ Join the movie" : "Waiting for the host to start";
+    b.disabled = !fileMeta || !mv || !started();
+  }
+  $("ppl").textContent = "👥 " + online.length;
+}
+$("main").onclick = () => {
+  if (isHost() && !started()){ sendCmd("play", 0); }
+  openPlayer();
+};
+
+/* ================= commands (same timeline format as the Android app) ================= */
+function expectedMs(){
+  if (tl.state !== "playing") return tl.pos;
+  const n = nowSrv(); if (n == null) return tl.pos;
+  return n >= tl.startAt ? tl.pos + (n - tl.startAt) * tl.rate : tl.pos;
+}
+function sendCmd(type, pos){
+  if (!canControl()) return pop("Only the host can control playback");
+  const n = nowSrv(); if (n == null) return pop("Syncing clock - try again in a second");
+  const seq = Math.max(tl.seq, +(room.timeline && room.timeline.seq) || 0) + 1;
+  let t;
+  if (type === "play"){
+    t = {state:"playing", pos:Math.round(pos), startAt:Math.round(n + (started() ? RESUME_LEAD : START_LEAD)), rate:1, seq};
+  } else if (type === "pause"){
+    t = {state:"paused", pos:Math.round(expectedMs()), startAt:0, rate:1, seq};
+  } else { // seek
+    const p = Math.max(0, Math.round(pos));
+    t = tl.state === "playing" ? {state:"playing", pos:p, startAt:Math.round(n + RESUME_LEAD), rate:1, seq}
+                               : {state:"paused",  pos:p, startAt:0, rate:1, seq};
+  }
+  tl = t; tlSig = [t.seq,t.state,t.pos,t.startAt].join("|");
+  room.timeline = t;
+  write("PUT", `rooms/${code}/timeline`, t);
+  if (inPlayer) applyTl();
+}
+
+/* ================= player ================= */
+const vid = $("vid");
+function prog(fn){ lastProg = Date.now(); fn(); }
+function openPlayer(){
+  if (!fileUrl) return;
+  inPlayer = true;
+  $("title").textContent = fileLabel.replace(/\.[^.]+$/, "");
+  $("player").classList.add("on");
+  showUi();
+  // iOS only lets a page start video after a tap: do a silent play/pause "unlock" right now
+  vid.muted = true;
+  const u = vid.play();
+  const done = () => { prog(()=>vid.pause()); vid.muted = false; applyTl(); };
+  if (u && u.then) u.then(done, done); else done();
+  renderPlayerUi();
+}
+function closePlayer(){
+  inPlayer = false; clearInterval(cdTimer); $("cd").style.display = "none";
+  prog(()=>vid.pause());
+  $("player").classList.remove("on");
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  renderLobby();
+}
+function applyTl(){
+  if (!inPlayer || !vid.src) return;
+  clearInterval(cdTimer); $("cd").style.display = "none"; driftF = null;
+  const n = nowSrv();
+  if (n == null){ $("status").textContent = "Syncing clock…"; return; }
+  $("status").textContent = "";
+  if (tl.state === "playing"){
+    if (n < tl.startAt){
+      prog(()=>{ vid.pause(); vid.playbackRate = 1; vid.currentTime = tl.pos/1000; });
+      cdTimer = setInterval(() => {
+        const r = tl.startAt - nowSrv();
+        if (tl.state !== "playing" || r <= 0){ clearInterval(cdTimer); $("cd").style.display = "none"; if (tl.state === "playing") applyTl(); return; }
+        $("cd").textContent = Math.ceil(r/1000); $("cd").style.display = "flex";
+      }, 80);
+    } else {
+      prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; vid.play().catch(()=>pop("Tap ▶ once to allow playback")); });
+    }
+  } else if (tl.state === "paused"){
+    prog(()=>{ vid.pause(); vid.playbackRate = 1; vid.currentTime = tl.pos/1000; });
+    $("status").textContent = canControl() ? "" : "Paused by host";
+  } else {
+    prog(()=>{ vid.pause(); vid.currentTime = 0; });
+  }
+  renderPlayerUi();
+}
+function renderPlayerUi(){
+  $("pp").textContent = tl.state === "playing" ? "⏸" : "▶";
+  $("seek").disabled = !canControl();
+  for (const id of ["pp","b10","f10"]) $(id).style.opacity = canControl() ? 1 : .45;
+}
+
+/* drift correction (same idea as the Android app): seek if far off, otherwise nudge speed up to ±2% */
+setInterval(() => {
+  if (!inPlayer || tl.state !== "playing" || vid.paused) return;
+  const n = nowSrv(); if (n == null || n < tl.startAt) return;
+  if (vid.readyState < 3){ driftF = null; $("status").textContent = "Buffering…"; return; }
+  const raw = expectedMs() - vid.currentTime*1000;               // + = we are behind
+  driftF = driftF == null ? raw : driftF + 0.3*(raw - driftF);
+  const a = Math.abs(driftF), now = performance.now();
+  if (a > 250){
+    if (now - lastSeekAt > 3000){ lastSeekAt = now; prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; }); driftF = null; }
+  } else if (a >= 40){
+    vid.playbackRate = tl.rate + Math.max(-0.02, Math.min(0.02, driftF/5000));
+  } else if (Math.abs(vid.playbackRate - tl.rate) > 0.0005){
+    vid.playbackRate = tl.rate;
+  }
+  if ($("status").textContent === "Buffering…") $("status").textContent = "";
+}, 500);
+
+/* controls */
+$("pp").onclick = () => { tl.state === "playing" ? sendCmd("pause") : sendCmd("play", expectedMs()); showUi(); };
+$("b10").onclick = () => { sendCmd("seek", expectedMs() - 10000); showUi(); };
+$("f10").onclick = () => { sendCmd("seek", expectedMs() + 10000); showUi(); };
+const seek = $("seek");
+seek.addEventListener("input", () => { dragging = true; $("tNow").textContent = fmt(seek.value/1000*(vid.duration||0)*1000); });
+seek.addEventListener("change", () => { dragging = false; sendCmd("seek", seek.value/1000*(vid.duration||0)*1000); });
+
+/* iPhone fullscreen uses native controls: treat those as commands, or re-sync if not allowed */
+function nativeEvent(){
+  if (!inPlayer || Date.now() - lastProg < 900) return;
+  if (!canControl()){ applyTl(); return; }
+  if (vid.paused && tl.state === "playing") sendCmd("pause");
+  else if (!vid.paused && tl.state !== "playing") sendCmd("play", vid.currentTime*1000);
+}
+vid.addEventListener("play", nativeEvent);
+vid.addEventListener("pause", nativeEvent);
+vid.addEventListener("seeked", () => {
+  if (!inPlayer || Date.now() - lastProg < 900) return;
+  if (!canControl()) applyTl(); else if (Math.abs(vid.currentTime*1000 - expectedMs()) > 1500) sendCmd("seek", vid.currentTime*1000);
+});
+
+setInterval(() => {
+  if (!inPlayer || dragging) return;
+  const d = vid.duration || 0;
+  $("tNow").textContent = fmt(vid.currentTime*1000); $("tDur").textContent = fmt(d*1000);
+  if (d) seek.value = Math.round(vid.currentTime/d*1000);
+}, 300);
+
+function showUi(){
+  $("ui").classList.remove("hide"); clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { if (!dragging) $("ui").classList.add("hide"); }, 4000);
+}
+$("player").addEventListener("click", e => {
+  if (e.target.closest("button,input")) { showUi(); return; }
+  $("ui").classList.contains("hide") ? showUi() : $("ui").classList.add("hide");
+});
+$("fs").onclick = () => {
+  const c = $("player");
+  if (c.requestFullscreen) c.requestFullscreen().catch(()=>{});
+  else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();     // iPhone Safari
+};
+$("back").onclick = closePlayer;
+
+/* ================= buttons ================= */
+$("create").onclick = createRoom;
+$("join").onclick = joinRoom;
+$("leave").onclick = () => { if (confirm(isHost() ? "End this room for everyone?" : "Leave the room?")) leaveRoom(); };
+$("ctlAll").onclick = () => write("PUT", `rooms/${code}/controlAll`, !controlAll);
+$("invite").onclick = async () => {
+  const link = location.origin + location.pathname + "#" + code;
+  const text = `Join my Watch Party!\nRoom code: ${code}\n${link}`;
+  try { if (navigator.share) await navigator.share({text}); else { await navigator.clipboard.writeText(text); pop("Copied"); } } catch(e){}
+};
+$("nick").addEventListener("change", saveNick);
+if (/^#\d{6}$/.test(location.hash)) $("codeIn").value = location.hash.slice(1);
+</script>
+</body>
+</html>
