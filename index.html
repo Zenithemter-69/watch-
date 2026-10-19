@@ -423,8 +423,9 @@ function onRoom(){
 /* ================= file + verification ================= */
 $("file").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
+  try{ vid.pause(); vid.removeAttribute("src"); vid.load(); }catch(_){}
   if (fileUrl) URL.revokeObjectURL(fileUrl);
-  fileUrl = URL.createObjectURL(f);
+  try{ fileUrl = URL.createObjectURL(f); }catch(ex){ $("fileHint").textContent = "⚠ Could not open that file: " + ex.message; return; }
   fileLabel = f.name; fileMeta = null; sentKey = null;
   closeHostPeers(); capStream = null;
   $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
@@ -676,7 +677,7 @@ $("back").onclick = closePlayer;
    NOTE: direct phone-to-phone connections fail on some mobile networks. If that happens, add a TURN server below. */
 const ICE = {iceServers:[{urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}
   /* , {urls:"turn:YOUR_TURN_HOST:3478", username:"USER", credential:"PASS"} */ ]};
-const QUAL = {low:{bps:500000, scale:2}, med:{bps:1200000, scale:1.5}, high:{bps:3000000, scale:1}};
+const QUAL = {low:{bps:500000, h:360}, med:{bps:1200000, h:480}, high:{bps:2500000, h:720}};
 let hostPeers = {}, capStream = null, lastQ = null;
 let vp = null, streamWanted = false, wakeLock = null;
 
@@ -689,7 +690,8 @@ async function keepAwake(on){
 const canCapture = () => !!(vid.captureStream || vid.mozCaptureStream);
 function getCapStream(){
   if (capStream && capStream.getTracks().length) return capStream;
-  capStream = vid.captureStream ? vid.captureStream() : (vid.mozCaptureStream ? vid.mozCaptureStream() : null);
+  try{ capStream = vid.captureStream ? vid.captureStream() : (vid.mozCaptureStream ? vid.mozCaptureStream() : null); }
+  catch(ex){ capStream = null; pop("Stream error: " + ex.message); }
   return capStream;
 }
 function candJson(c){ return {c:c.candidate, m:c.sdpMid, i:c.sdpMLineIndex}; }
@@ -712,7 +714,7 @@ function applyQuality(pc){
       const p = s.getParameters();
       if (!p.encodings || !p.encodings.length) p.encodings = [{}];
       p.encodings[0].maxBitrate = q.bps;
-      p.encodings[0].scaleResolutionDownBy = q.scale;
+      p.encodings[0].scaleResolutionDownBy = Math.max(1, (vid.videoHeight || q.h) / q.h);
       p.degradationPreference = "maintain-framerate";
       s.setParameters(p).catch(()=>{});
     }catch(e){}
@@ -726,7 +728,7 @@ async function startHostPeer(viewerId, want){
   const old = hostPeers[viewerId]; if (old && old.pc) { try{ old.pc.close(); }catch(e){} }
   const cs = getCapStream();
   if (!cs || !cs.getTracks().length){ hostPeers[viewerId] = {pc:null, want:null}; setTimeout(processStream, 1000); return; }
-  const pc = new RTCPeerConnection(ICE);
+  let pc; try{ pc = new RTCPeerConnection(ICE); }catch(ex){ pop("Stream error: " + ex.message); return; }
   const hp = {pc, want, seen:new Set(), q:[], remoteSet:false, offerSdp:null};
   hostPeers[viewerId] = hp;
   cs.getTracks().forEach(t => { if (t.kind === "video") t.contentHint = "motion"; pc.addTrack(t, cs); });
@@ -818,7 +820,7 @@ function processStream(){
   if (!code) return;
   const rtc = room.rtc || {};
   if (isHost()){
-    if (fileMeta && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
+    if (fileMeta && room.mode === "stream" && !room.stream && canCapture() && autoStreamKey !== fileLabel + fileMeta.size){
       autoStreamKey = fileLabel + fileMeta.size;     // streaming is offered as soon as the host's file is ready
       startStreaming();
     }
