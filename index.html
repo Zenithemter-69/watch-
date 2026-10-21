@@ -46,6 +46,7 @@
   #plist div{padding:5px 0}
   #plist small{color:#9a9aa2;display:block}
   video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+  #skipFx{position:absolute;top:50%;transform:translateY(-50%);padding:14px 22px;border-radius:40px;background:#000b;color:#fff;font-size:22px;font-weight:700;display:none;pointer-events:none;z-index:2}
   #cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;text-shadow:0 0 20px #000;pointer-events:none}
   #ui{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(#000a,#0000 25%,#0000 65%,#000c)}
   #ui.hide{opacity:0;pointer-events:none}
@@ -182,6 +183,7 @@
 <div id="player">
   <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
   <div id="cd"></div>
+  <div id="skipFx"></div>
   <div id="status"></div>
   <div id="pop"></div>
   <div id="ui">
@@ -248,7 +250,7 @@
 <script>
 /* ================= config (same Firebase + same data layout as the Android app) ================= */
 const DB = "https://study-app-fff47-default-rtdb.firebaseio.com";
-const START_LEAD = 3000, RESUME_LEAD = 1500, ONLINE_WINDOW = 25000;
+const START_LEAD = 3000, RESUME_LEAD = 1500, SEEK_LEAD = 200, ONLINE_WINDOW = 25000;
 const SV = {".sv":"timestamp"};
 const $ = id => document.getElementById(id);
 const url = p => `${DB}/${p}.json`;
@@ -464,7 +466,7 @@ function onRoom(){
     const sig = [t.seq,t.state,t.pos,t.startAt].join("|");
     if (sig !== tlSig){
       tlSig = sig;
-      tl = {state:t.state, pos:+t.pos||0, startAt:+t.startAt||0, rate:+t.rate||1, seq:+t.seq||0};
+      tl = {state:t.state, pos:+t.pos||0, startAt:+t.startAt||0, rate:+t.rate||1, seq:+t.seq||0, cd:!!t.cd};
       if (inPlayer) applyTl();
     }
   }
@@ -687,12 +689,12 @@ function sendCmd(type, pos){
   const seq = Math.max(tl.seq, +(room.timeline && room.timeline.seq) || 0) + 1;
   let t;
   if (type === "play"){
-    t = {state:"playing", pos:Math.round(pos), startAt:Math.round(n + (started() ? RESUME_LEAD : START_LEAD)), rate:1, seq};
+    t = {state:"playing", pos:Math.round(pos), startAt:Math.round(n + (started() ? RESUME_LEAD : START_LEAD)), rate:1, seq, cd:1};
   } else if (type === "pause"){
     t = {state:"paused", pos:Math.round(expectedMs()), startAt:0, rate:1, seq};
   } else { // seek
     const p = Math.max(0, Math.round(pos));
-    t = tl.state === "playing" ? {state:"playing", pos:p, startAt:Math.round(n + RESUME_LEAD), rate:1, seq}
+    t = tl.state === "playing" ? {state:"playing", pos:p, startAt:Math.round(n + SEEK_LEAD), rate:1, seq}
                                : {state:"paused",  pos:p, startAt:0, rate:1, seq};
   }
   tl = t; tlSig = [t.seq,t.state,t.pos,t.startAt].join("|");
@@ -732,11 +734,12 @@ function applyTl(){
   $("status").textContent = "";
   if (tl.state === "playing"){
     if (n < tl.startAt){
+      const showCd = tl.cd || (tl.startAt - n) > 1000;
       prog(()=>{ vid.pause(); vid.playbackRate = 1; vid.currentTime = tl.pos/1000; });
       cdTimer = setInterval(() => {
         const r = tl.startAt - nowSrv();
         if (tl.state !== "playing" || r <= 0){ clearInterval(cdTimer); $("cd").style.display = "none"; if (tl.state === "playing") applyTl(); return; }
-        $("cd").textContent = Math.ceil(r/1000); $("cd").style.display = "flex";
+        if (showCd){ $("cd").textContent = Math.ceil(r/1000); $("cd").style.display = "flex"; }
       }, 80);
     } else {
       prog(()=>{ vid.currentTime = expectedMs()/1000; vid.playbackRate = tl.rate; vid.play().catch(()=>pop("Tap ▶ once to allow playback")); });
@@ -816,8 +819,32 @@ function showUi(){
   $("ui").classList.remove("hide"); clearTimeout(hideTimer);
   hideTimer = setTimeout(() => { if (!dragging) $("ui").classList.add("hide"); }, 4000);
 }
+/* double-tap left/right to skip 10s; keep tapping to add 10s more (committed once, after you stop tapping) */
+let lastTapT = 0, lastSide = 0, skipAcc = 0, skipActive = false, skipTimer = null, skipHide = null, uiHiddenBefore = false;
+function commitSkip(){
+  skipActive = false; const acc = skipAcc; skipAcc = 0;
+  clearTimeout(skipHide); skipHide = setTimeout(() => { $("skipFx").style.display = "none"; }, 500);
+  if (!acc) return;
+  const dur = (vid.duration || 0) * 1000;
+  let target = expectedMs() + acc * 1000;
+  target = Math.max(0, dur ? Math.min(dur - 500, target) : target);
+  sendCmd("seek", target);
+}
 $("player").addEventListener("click", e => {
   if (e.target.closest("button,input")) { showUi(); return; }
+  const now = Date.now(), side = e.clientX < innerWidth * 0.4 ? -1 : e.clientX > innerWidth * 0.6 ? 1 : 0;
+  const quick = now - lastTapT < (skipActive ? 700 : 320);
+  if (side !== 0 && quick && lastSide !== 0){
+    if (!canControl()){ pop("Only the host can skip"); lastTapT = 0; return; }
+    if (!skipActive){ skipActive = true; skipAcc = 0; uiHiddenBefore ? $("ui").classList.add("hide") : showUi(); }   // undo the first tap's UI toggle
+    skipAcc += side * 10; lastTapT = now; lastSide = side;
+    const fx = $("skipFx"); clearTimeout(skipHide);
+    fx.style.left = side < 0 ? "12%" : "auto"; fx.style.right = side > 0 ? "12%" : "auto";
+    fx.textContent = (skipAcc < 0 ? "⏪ " : "⏩ ") + (skipAcc > 0 ? "+" : "") + skipAcc + " s"; fx.style.display = "block";
+    clearTimeout(skipTimer); skipTimer = setTimeout(commitSkip, 450);
+    return;
+  }
+  uiHiddenBefore = $("ui").classList.contains("hide"); lastTapT = now; lastSide = side;
   $("ui").classList.contains("hide") ? showUi() : $("ui").classList.add("hide");
 });
 $("fs").onclick = () => {
