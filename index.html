@@ -437,9 +437,13 @@ function onRoom(){
   const now = nowSrv();
 
   // subtitles shared by the host: guests who didn't pick their own get them automatically
-  if (!isHost() && !subLocal && room.subs && room.subs.text){
-    const rk = (room.subs.name || "") + ":" + room.subs.text.length;
-    if (rk !== subRemoteKey){ subRemoteKey = rk; try{ setSubs(room.subs.text); }catch(_){} }
+  if (!isHost() && !subLocal){
+    const mvk = room.movie ? room.movie.name + ":" + room.movie.size : null;
+    const ok = room.subs && room.subs.text && room.subs.k && mvk && room.subs.k === mvk;    // only for the movie they belong to
+    if (ok){
+      const rk = room.subs.k + ":" + room.subs.text.length;
+      if (rk !== subRemoteKey){ subRemoteKey = rk; try{ setSubs(room.subs.text); }catch(_){} }
+    } else if (subRemoteKey){ clearSubs(); }      // host changed movie or removed subtitles
   }
 
   // people
@@ -495,7 +499,7 @@ $("file").addEventListener("change", e => {
   if (fileUrl) URL.revokeObjectURL(fileUrl);
   try{ fileUrl = URL.createObjectURL(f); }catch(ex){ $("fileHint").textContent = "⚠ Could not open that file: " + ex.message; return; }
   fileLabel = f.name; fileMeta = null; sentKey = null;
-  closeHostPeers(); capStream = null; clearSubs();
+  closeHostPeers(); capStream = null; clearSubs(); if (isHost() && code) write("DELETE", `rooms/${code}/subs`);
   $("fileName").textContent = f.name + "  (" + (f.size/1048576).toFixed(0) + " MB)";
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   $("fileHint").textContent = isIOS && /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? "⚠ iPhone can't play this format. Use an .mp4 / .mov (H.264)." : "Reading movie length…";
@@ -513,7 +517,7 @@ $("file").addEventListener("change", e => {
 
 /* subtitles: .srt/.vtt, English by default, remembered per movie file */
 let subUrl = null, subEl = null, subsOn = true, subLocal = false, subRemoteKey = null;
-function shareSubs(text, name){ try{ if (isHost() && code && text.length < 900000) write("PUT", `rooms/${code}/subs`, {name: name || "subtitles", text}); }catch(_){} }
+function shareSubs(text, name){ try{ if (isHost() && code && text.length < 900000) write("PUT", `rooms/${code}/subs`, {name: name || "subtitles", text, k: fileMeta ? fileLabel + ":" + fileMeta.size : ""}); }catch(_){} }
 function srtToVtt(t){ t = t.replace(/^\uFEFF/, "").replace(/\r+/g, ""); return /^WEBVTT/.test(t) ? t : "WEBVTT\n\n" + t.replace(/(\d+:\d+:\d+),(\d+)/g, "$1.$2"); }
 function clearSubs(){ subLocal = false; subRemoteKey = null; try{ if (subEl) subEl.remove(); if (subUrl) URL.revokeObjectURL(subUrl); }catch(_){} subEl = null; subUrl = null; }
 function setSubs(text){
