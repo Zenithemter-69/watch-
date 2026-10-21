@@ -67,18 +67,18 @@
   #vbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;background:linear-gradient(#000a,#0000)}
   #vbar .t{flex:1;font-size:13px}
   #tap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:18px 28px;display:none;font-size:18px}
-  #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
-  #chat.on{display:flex;touch-action:pan-y}
+  /* ---- chat panel: full screen in the lobby, beside / under the video while watching ---- */
+  #chat{position:fixed;z-index:8;display:none;flex-direction:column;background:#0E0E10;top:0;left:0;right:0;bottom:var(--kb,0px);max-width:640px;margin:0 auto;border-left:1px solid #2a2a2e;border-right:1px solid #2a2a2e;padding-top:env(safe-area-inset-top);overscroll-behavior:contain}
+  #chat.on{display:flex}
   body:has(#chat.on){overflow:hidden}
   body:has(#chat.on):has(#player.on), body:has(#chat.on):has(#viewer.on){background:#000}
-  /* chat opens beside / under the video instead of covering it */
   @media (orientation:landscape){
-    #chat{width:min(250px,32vw)}
-    body:has(#chat.on) #player, body:has(#chat.on) #viewer{right:min(250px,32vw)}
+    body:has(#player.on) #chat, body:has(#viewer.on) #chat{left:auto;right:0;width:min(290px,38vw);max-width:none;margin:0;border:0;border-left:1px solid #2a2a2e}
+    body:has(#chat.on) #player, body:has(#chat.on) #viewer{right:min(290px,38vw)}
   }
   @media (orientation:portrait){
-    #chat{top:auto;left:0;width:auto;height:46%;border-left:0;border-top:1px solid #2a2a2e;padding-top:0}
-    body:has(#chat.on) #player, body:has(#chat.on) #viewer{bottom:46%}
+    body:has(#player.on) #chat, body:has(#viewer.on) #chat{top:auto;height:46%;max-width:none;margin:0;border:0;border-top:1px solid #2a2a2e;padding-top:0}
+    body:has(#chat.on) #player, body:has(#chat.on) #viewer{bottom:calc(46% + var(--kb,0px))}
   }
   #chatFab{position:fixed;right:10px;top:46%;width:46px;height:46px;border-radius:50%;padding:0;background:#000b;border:1px solid #ffffff40;font-size:20px;z-index:7;display:none;align-items:center;justify-content:center;opacity:.55;width:46px;margin:0}
   #chatFab.has{opacity:1;border-color:#ff4d5e}
@@ -87,13 +87,73 @@
   #fabToast{position:fixed;right:64px;top:46%;max-width:60vw;background:#2a2a2eEE;color:#fff;padding:8px 12px;border-radius:14px;font-size:13px;z-index:7;display:none}
   body:has(#player.on) #chatFab, body:has(#viewer.on) #chatFab{display:flex}
   body:has(#chat.on) #chatFab, body:has(#chat.on) #fabToast{display:none !important}
-  #chatHead{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
-  #chatLog{flex:1;min-height:0;overscroll-behavior:contain;overflow-y:auto;padding:6px 12px;-webkit-overflow-scrolling:touch}
-  .cm{margin-bottom:8px;font-size:14px;line-height:1.35;word-wrap:break-word;overflow-wrap:anywhere}
-  .cm b{color:var(--accent)}
-  #chatForm{display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
-  #chatIn{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #333;background:#121214;color:var(--txt);font-size:16px}
+  #chatHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px 8px;border-bottom:1px solid #1f1f24}
+  #chatHead .ct{display:flex;flex-direction:column;line-height:1.2}
+  #chatHead .ct b{font-size:16px}
+  #chatHead .ct span{font-size:11px;color:var(--mute)}
+  #chatWrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+  #chatLog{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:8px 10px 10px;display:flex;flex-direction:column;gap:2px}
+  #chatEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mute);font-size:14px;line-height:1.6;padding:20px;pointer-events:none}
+  #chatEmpty small{display:block;font-size:12px;opacity:.7;margin-top:6px}
+  #chatJump{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:auto;padding:7px 14px;font-size:13px;border-radius:18px;background:#2a2a30;color:var(--txt);box-shadow:0 4px 14px #0008;display:none;z-index:2}
+  .mrow{display:flex;flex-direction:column;max-width:84%;min-width:0}
+  .mrow.mine{align-self:flex-end;align-items:flex-end}
+  .mrow.other{align-self:flex-start;align-items:flex-start}
+  .mrow.first{margin-top:8px}
+  .mrow:first-child{margin-top:0}
+  .mname{font-size:11px;font-weight:600;margin:0 8px 2px;display:none}
+  .mb{position:relative;padding:7px 11px 5px;border-radius:18px;background:#26262b;color:var(--txt);max-width:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:pan-y;transition:opacity .2s}
+  .mrow.mine .mb{background:var(--accent);color:#06140c;border-bottom-right-radius:6px}
+  .mrow.other .mb{border-bottom-left-radius:6px}
+  .mt{font-size:15px;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+  .mm{font-size:10px;opacity:.6;text-align:right;margin-top:1px;white-space:nowrap}
+  .mrow.sending .mb{opacity:.5}
+  .mrow.failed .mb{background:#3a1f22;color:#ffd9dc;outline:1px solid #ff6b6b}
+  .rx{display:flex;flex-wrap:wrap;gap:4px;margin:-6px 0 4px;padding:0 6px;position:relative;z-index:1}
+  .rx:empty{display:none}
+  .rxc{background:#2d2d34;border:1px solid #3d3d46;border-radius:12px;padding:1px 7px;font-size:12px;line-height:18px;color:var(--txt);cursor:pointer;-webkit-user-select:none;user-select:none}
+  .rxc.mine{background:#173826;border-color:var(--accent)}
+  #chatForm{display:flex;align-items:center;gap:8px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));border-top:1px solid #1f1f24;background:#0E0E10}
+  #chatIn{flex:1;min-width:0;padding:11px 16px;border-radius:22px;border:1px solid #333;background:#161619;color:var(--txt);font-size:16px}
+  #chatIn:focus{outline:none;border-color:#3d6b52}
+  #chatSend{width:44px;height:44px;padding:0;border-radius:50%;font-size:18px;flex:none;display:flex;align-items:center;justify-content:center}
+  #cpop{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);background:#2a2a2eEE;color:#fff;padding:7px 14px;border-radius:18px;font-size:13px;display:none;z-index:9;white-space:nowrap}
+  /* long-press menu */
+  #msgMenu{position:absolute;inset:0;z-index:6;display:none;background:rgba(6,6,8,.74);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+  #msgMenu.on{display:block}
+  #mmBox{position:absolute;left:10px;right:10px;top:0;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #mmBox>*{pointer-events:auto}
+  #mmBox.mine{align-items:flex-end}
+  #mmBox.other{align-items:flex-start}
+  #mmBar{display:flex;gap:1px;background:#24242a;border:1px solid #35353d;border-radius:30px;padding:4px 5px;max-width:100%;overflow-x:auto;scrollbar-width:none;box-shadow:0 8px 26px #000a}
+  #mmBar::-webkit-scrollbar{display:none}
+  #mmBar button{width:40px;height:40px;flex:none;padding:0;background:transparent;color:inherit;font-size:25px;line-height:1;border-radius:50%}
+  #mmBar button.sel{background:#3b3b46}
+  #mmBar button:active{transform:scale(1.3)}
+  #mmBar button.plus{font-size:20px;color:var(--mute);background:#2f2f37}
+  #mmClone{max-width:100%}
+  .mrow.clone{max-width:100%;margin:0}
+  #mmActions{background:#24242a;border:1px solid #35353d;border-radius:16px;overflow:hidden;min-width:190px;max-width:100%;box-shadow:0 8px 26px #000a}
+  #mmActions button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;background:transparent;color:var(--txt);border-radius:0;padding:13px 16px;font-size:15px;font-weight:500;text-align:left;border-bottom:1px solid #30303a}
+  #mmActions button:last-child{border-bottom:0}
+  #mmActions button.del{color:#ff6b6b}
+  #mmActions button:active{background:#2f2f38}
+  #mmGrid{position:absolute;left:0;right:0;bottom:0;max-height:64%;display:none;flex-direction:column;background:#1b1b20;border-top:1px solid #34343c;border-radius:20px 20px 0 0;padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
+  #mmGrid.on{display:flex}
+  #msgMenu.grid #mmBox{display:none}
+  #mmGridHead{display:flex;align-items:center;justify-content:space-between;padding:0 8px 8px;font-weight:700;font-size:15px}
+  #mmGridBody{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:2px;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain}
+  #mmGridBody button{width:100%;height:46px;padding:0;background:transparent;color:inherit;font-size:27px;border-radius:12px}
+  #mmGridBody button:active{background:#33333c}
   #lpop{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2a2a2e;padding:8px 16px;border-radius:20px;font-size:13px;display:none;z-index:9}
+  /* subtitles pop-over + small buttons */
+  #subBox{position:fixed;top:60px;right:12px;width:min(270px,84vw);background:#0E0E10f2;border:1px solid #2a2a2e;border-radius:14px;padding:12px 14px;z-index:9;display:none;font-size:14px}
+  #subBox.on{display:block}
+  #subBox .bs{font-size:12px;color:#9a9aa2;margin:2px 0 4px;line-height:1.35}
+  #subBox button,#subBox label{margin-top:8px}
+  .sm{padding:10px 12px;font-size:14px}
+  .subrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .subrow button{flex:1 1 140px}
 </style>
 </head>
 <body>
@@ -169,9 +229,15 @@
     </label>
     <div class="who" id="fileName">No file chosen</div>
     <div class="who" id="fileHint"></div>
-    <label class="filebtn" style="margin-top:8px">💬 Subtitles (.srt / .vtt, optional)
+    <label class="filebtn" style="margin-top:8px">💬 Add subtitles (.srt / .vtt, optional)
       <input id="subFile" type="file">
     </label>
+    <div class="who" id="subInfo">No subtitles</div>
+    <div class="subrow">
+      <button class="sec sm" id="subClearMe" style="display:none">🗑 Remove for me</button>
+      <button class="sec sm" id="subClearAll" style="display:none">🗑 Remove for everyone</button>
+      <button class="sec sm" id="subShow" style="display:none">Show host's subtitles</button>
+    </div>
   </div>
 
   <div class="msg" id="roomMsg"></div>
@@ -220,17 +286,46 @@
   <div style="font-size:11px;color:#9a9aa2;margin-top:8px">Boost above 100% can distort and is hard on speakers and ears. Go up slowly.</div>
 </div>
 
+<div id="subBox">
+  <div style="font-weight:700">Subtitles</div>
+  <div class="bs" id="subBoxInfo">No subtitles</div>
+  <button class="sec sm" id="subToggle">Turn off</button>
+  <label class="filebtn sm">📁 Add .srt / .vtt<input id="subFile2" type="file"></label>
+  <button class="sec sm" id="subClearMe2" style="display:none">🗑 Remove for me</button>
+  <button class="sec sm" id="subClearAll2" style="display:none">🗑 Remove for everyone</button>
+  <button class="sec sm" id="subShow2" style="display:none">Show host's subtitles</button>
+</div>
+
 <!-- CHAT (slides in from the right, over any screen) -->
 <button id="chatFab" aria-label="Chat">💬<span id="fabDot"></span></button>
 <div id="fabToast"></div>
 
 <div id="chat">
-  <div id="chatHead"><b>💬 Chat</b><button class="chip sec" id="chatClose">✕</button></div>
-  <div id="chatLog"></div>
+  <div id="chatHead">
+    <div class="ct"><b>💬 Chat</b><span id="chatSub">1 online</span></div>
+    <button class="chip sec" id="chatClose" aria-label="Close chat">✕</button>
+  </div>
+  <div id="chatWrap">
+    <div id="chatLog"></div>
+    <div id="chatEmpty"><div>No messages yet.<br>Say hi 👋<small>Long-press a message to react, copy or delete it.</small></div></div>
+    <button id="chatJump" type="button">↓ New</button>
+  </div>
   <form id="chatForm" autocomplete="off">
-    <input id="chatIn" type="text" maxlength="300" placeholder="Type a message…" enterkeyhint="send">
-    <button type="submit" style="width:auto;padding:12px 16px">Send</button>
+    <input id="chatIn" type="text" maxlength="300" placeholder="Message…" enterkeyhint="send">
+    <button type="submit" id="chatSend" aria-label="Send" disabled>➤</button>
   </form>
+  <div id="cpop"></div>
+  <div id="msgMenu">
+    <div id="mmBox">
+      <div id="mmBar"></div>
+      <div id="mmClone"></div>
+      <div id="mmActions"></div>
+    </div>
+    <div id="mmGrid">
+      <div id="mmGridHead"><span>React</span><button class="chip sec" id="mmGridClose" type="button">✕</button></div>
+      <div id="mmGridBody"></div>
+    </div>
+  </div>
 </div>
 
 <!-- STREAM VIEWER -->
@@ -357,6 +452,7 @@ async function joinRoom(){
 }
 function enterRoom(c, id){
   err(""); code = c; myId = id; room = {}; tlSig = ""; sentKey = null; gotData = false;
+  knownP = {}; knownInit = false; lobbySig = ""; subsClearInit = false; subIgnoreKey = null; resetChat();
   tl = {state:"stopped",pos:0,startAt:0,rate:1,seq:0};
   controlAll = false; controllers = new Set();
   try{ localStorage.wp_room = JSON.stringify({c, id, t:Date.now()}); }catch(e){}
@@ -366,14 +462,15 @@ function enterRoom(c, id){
   startClock();
   timers.push(setInterval(heartbeat, 6000));
   openStream();
+  openChatStream();
   if (fileMeta) { sentKey = null; ensureVerified(); }
 }
 function cleanup(msg){
   if (es) es.close(); es = null;
   closeHostPeers(); closeViewerPeer(); capStream = null; streamWanted = false;
   $("viewer").classList.remove("on"); keepAwake(false);
-  autoStreamKey = null; chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false; pendingChat = [];
-  $("chat").classList.remove("on"); $("chatLog").innerHTML = ""; setBadge();
+  autoStreamKey = null; if (ces) ces.close(); ces = null; resetChat();
+  knownP = {}; knownInit = false; lobbySig = ""; subIgnoreKey = null; if (!subLocal) clearSubs();
   timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
   clearInterval(cdTimer);
   vid.pause(); inPlayer = false; $("player").classList.remove("on");
@@ -397,8 +494,25 @@ function heartbeat(){
 }
 
 /* ================= live stream (Firebase server-sent events) ================= */
-let lastEvt = Date.now();
-setInterval(() => { if (code && es && Date.now() - lastEvt > 50000){ lastEvt = Date.now(); openStream(); } }, 15000);
+let lastEvt = Date.now(), lastChatEvt = Date.now(), ces = null;
+/* Somebody is always writing a heartbeat every few seconds, so 18s of silence means the connection is dead
+   (typical on mobile data or after the phone slept). Re-open it quickly instead of waiting a minute. */
+setInterval(() => {
+  if (!code) return;
+  const t = Date.now();
+  if (es && t - lastEvt > 18000){ lastEvt = t; openStream(); openChatStream(); }
+  else if (ces && t - lastChatEvt > 70000){ openChatStream(); }
+}, 4000);
+function revive(){
+  if (!code) return;
+  if (Date.now() - lastEvt > 8000){ lastEvt = Date.now(); openStream(); }
+  openChatStream();
+  pingClock();
+  for (const o of outbox.values()) if (o.state === "failed") sendOne(o);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) revive(); });
+window.addEventListener("online", revive);
+window.addEventListener("pageshow", e => { if (e.persisted) revive(); });
 function openStream(){
   if (es) es.close();
   lastEvt = Date.now();
@@ -415,35 +529,55 @@ function openStream(){
   });
   es.addEventListener("cancel", () => cleanup("No access - check your Firebase rules"));
 }
-function setAt(path, val){
-  gotData = true;
+function applyAt(root, path, val){
   const segs = path.split("/").filter(Boolean);
-  if (!segs.length){ room = (val && typeof val === "object") ? val : {}; return; }
-  let o = room;
+  if (!segs.length) return (val && typeof val === "object") ? val : {};
+  let o = root;
   for (let i=0;i<segs.length-1;i++){
-    if (o[segs[i]] == null || typeof o[segs[i]] !== "object"){ if (val == null) return; o[segs[i]] = {}; }
+    if (o[segs[i]] == null || typeof o[segs[i]] !== "object"){ if (val == null) return root; o[segs[i]] = {}; }
     o = o[segs[i]];
   }
   const k = segs[segs.length-1];
   if (val == null) delete o[k]; else o[k] = val;
+  return root;
+}
+function setAt(path, val){
+  gotData = true;
+  const segs = path.split("/").filter(Boolean);
+  if (segs[0] === "chat") return;                 // chat arrives on its own connection (see openChatStream)
+  if (!segs.length){
+    const keep = room.chat;
+    room = (val && typeof val === "object") ? val : {};
+    if (keep) room.chat = keep; else delete room.chat;
+    return;
+  }
+  room = applyAt(room, path, val);
 }
 
 /* ================= room changed ================= */
-let people = [], knownP = {}, knownInit = false, gotData = false, lastAllReady = false;
+let people = [], knownP = {}, knownInit = false, gotData = false, lastAllReady = false, lobbySig = "";
 function onRoom(){
   if (!code) return;
   if (!gotData) return;                       // room data has not arrived yet
   if (!room.hostId) return cleanup("Host closed the room");
   const now = nowSrv();
 
+  // subtitles: "remove for everyone" from the host/controller clears everybody's copy, including saved ones
+  const scAt = room.subsClear && room.subsClear.at;
+  if (!subsClearInit){ subsClearInit = true; lastSubsClear = scAt || 0; }
+  else if (scAt && scAt !== lastSubsClear){
+    lastSubsClear = scAt;
+    if (room.subsClear.by !== myId){ removeSubsLocal(); pop("Subtitles were removed"); }
+  }
   // subtitles shared by the host: guests who didn't pick their own get them automatically
   if (!isHost() && !subLocal){
     const mvk = room.movie ? room.movie.name + ":" + room.movie.size : null;
-    const ok = room.subs && room.subs.text && room.subs.k && mvk && room.subs.k === mvk;    // only for the movie they belong to
+    const ok = !!(room.subs && room.subs.text && room.subs.k && mvk && room.subs.k === mvk);   // only for the movie they belong to
     if (ok){
-      const rk = room.subs.k + ":" + room.subs.text.length;
-      if (rk !== subRemoteKey){ subRemoteKey = rk; try{ setSubs(room.subs.text); }catch(_){} }
-    } else if (subRemoteKey){ clearSubs(); }      // host changed movie or removed subtitles
+      const rk = subRemoteId(room.subs);
+      if (rk === subIgnoreKey){ /* this person removed these on their side */ }
+      else if (rk !== subRemoteKey){ try{ setSubs(room.subs.text, room.subs.name); subRemoteKey = rk; }catch(_){} }
+    } else { subIgnoreKey = null; if (subRemoteKey || subEl) clearSubs(); }   // host changed movie or removed subtitles
   }
 
   // people
@@ -488,7 +622,7 @@ function onRoom(){
   }
   ensureVerified();
   processStream();
-  chatUpdate();
+  chatHeader();
   renderLobby();
 }
 
@@ -516,38 +650,84 @@ $("file").addEventListener("change", e => {
 });
 
 /* subtitles: .srt/.vtt, English by default, remembered per movie file */
-let subUrl = null, subEl = null, subsOn = true, subLocal = false, subRemoteKey = null;
-function shareSubs(text, name){ try{ if (isHost() && code && text.length < 900000) write("PUT", `rooms/${code}/subs`, {name: name || "subtitles", text, k: fileMeta ? fileLabel + ":" + fileMeta.size : ""}); }catch(_){} }
+let subUrl = null, subEl = null, subsOn = true, subLocal = false, subRemoteKey = null, subIgnoreKey = null, subName = "", subsClearInit = false, lastSubsClear = 0;
+function subRemoteId(s){ return (s.k || "") + ":" + (s.v || 0) + ":" + (s.text ? s.text.length : 0); }
+function shareSubs(text, name){ try{ if (isHost() && code && text.length < 900000) write("PUT", `rooms/${code}/subs`, {name: name || "subtitles", text, k: fileMeta ? fileLabel + ":" + fileMeta.size : "", v: Date.now()}); }catch(_){} }
 function srtToVtt(t){ t = t.replace(/^\uFEFF/, "").replace(/\r+/g, ""); return /^WEBVTT/.test(t) ? t : "WEBVTT\n\n" + t.replace(/(\d+:\d+:\d+),(\d+)/g, "$1.$2"); }
-function clearSubs(){ subLocal = false; subRemoteKey = null; try{ if (subEl) subEl.remove(); if (subUrl) URL.revokeObjectURL(subUrl); }catch(_){} subEl = null; subUrl = null; }
-function setSubs(text){
+function clearSubs(){ subLocal = false; subRemoteKey = null; subName = ""; try{ if (subEl) subEl.remove(); if (subUrl) URL.revokeObjectURL(subUrl); }catch(_){} subEl = null; subUrl = null; renderSubUi(); }
+function setSubs(text, name){
   clearSubs();
   subUrl = URL.createObjectURL(new Blob([srtToVtt(text)], {type:"text/vtt"}));
   subEl = document.createElement("track");
   subEl.kind = "subtitles"; subEl.label = "English"; subEl.srclang = "en"; subEl.src = subUrl; subEl.default = true;
   vid.appendChild(subEl);
   subEl.track.mode = subsOn ? "showing" : "disabled";
+  subName = name || "subtitles";
+  renderSubUi();
 }
 function autoEnglish(){
   try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ if (/^en/i.test(tt.language || "") || /eng/i.test(tt.label || "")) tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
 }
 function subKey(){ return fileMeta ? "subs:" + fileLabel + ":" + fileMeta.size : null; }
-function restoreSubs(){ try{ const k = subKey(), t = k && localStorage.getItem(k); if (t){ setSubs(t); subLocal = true; shareSubs(t, "saved"); } }catch(_){} autoEnglish(); }
-$("subFile").addEventListener("change", async e => {
-  const f = e.target.files[0]; if (!f) return;
+function restoreSubs(){
   try{
-    const text = await f.text(); setSubs(text); subsOn = true; subLocal = true; shareSubs(text, f.name);
-    const k = subKey(); if (k && text.length < 1500000) { try{ localStorage.setItem(k, text); }catch(_){} }
+    const k = subKey(), t = k && localStorage.getItem(k);
+    if (t){ const nm = localStorage.getItem(k + ":n") || "saved subtitles"; setSubs(t, nm); subLocal = true; shareSubs(t, nm); renderSubUi(); }
+  }catch(_){}
+  autoEnglish();
+}
+async function onSubFile(e){
+  const inp = e.target, f = inp.files[0]; if (!f) return;
+  try{
+    const buf = await f.arrayBuffer();
+    let text; try{ text = new TextDecoder("utf-8", {fatal:true}).decode(buf); }catch(_){ text = new TextDecoder("windows-1252").decode(buf); }   // old .srt files are often not UTF-8
+    setSubs(text, f.name); subsOn = true; subLocal = true; subIgnoreKey = null; shareSubs(text, f.name);
+    const k = subKey(); if (k && text.length < 1500000){ try{ localStorage.setItem(k, text); localStorage.setItem(k + ":n", f.name); }catch(_){} }
     $("fileHint").textContent = "Subtitles loaded: " + f.name;
+    renderSubUi(); pop("Subtitles loaded");
   }catch(ex){ $("fileHint").textContent = "⚠ Could not read subtitles: " + ex.message; }
-});
-$("ccBtn").onclick = () => {
+  inp.value = "";            // so picking the same file again (after removing it) still works
+}
+$("subFile").addEventListener("change", onSubFile);
+$("subFile2").addEventListener("change", onSubFile);
+/* remove for me: forget the saved copy and hide whatever is showing (host's included); remove for everyone: host/controller, clears every phone */
+function removeSubsLocal(){
+  const k = subKey(); try{ if (k){ localStorage.removeItem(k); localStorage.removeItem(k + ":n"); } }catch(_){}
+  if (!isHost() && room.subs && room.subs.text) subIgnoreKey = subRemoteId(room.subs);
+  clearSubs();
+}
+function removeSubsAll(){
+  removeSubsLocal();
+  if (code && canControl()){
+    write("DELETE", `rooms/${code}/subs`);
+    write("PUT", `rooms/${code}/subsClear`, {by: myId, at: SV});
+    pop("Subtitles removed for everyone");
+  }
+}
+for (const [id, fn] of [["subClearMe", removeSubsLocal], ["subClearMe2", removeSubsLocal], ["subClearAll", removeSubsAll], ["subClearAll2", removeSubsAll]])
+  $(id).onclick = () => { fn(); renderSubUi(); };
+for (const id of ["subShow", "subShow2"]) $(id).onclick = () => { subIgnoreKey = null; onRoom(); renderSubUi(); };
+function toggleSubs(){
   subsOn = !subsOn;
-  let any = false;
-  try{ for (const tt of vid.textTracks){ if (tt.kind === "subtitles" || tt.kind === "captions"){ any = true; tt.mode = subsOn ? "showing" : "disabled"; } } }catch(_){}
-  pop(any ? (subsOn ? "Subtitles on" : "Subtitles off") : "No subtitles loaded. Add a .srt file in the lobby.");
-  showUi();
-};
+  try{ for (const tt of vid.textTracks) if (tt.kind === "subtitles" || tt.kind === "captions") tt.mode = subsOn ? "showing" : "disabled"; }catch(_){}
+  renderSubUi();
+}
+$("subToggle").onclick = toggleSubs;
+$("ccBtn").onclick = e => { e.stopPropagation(); togglePop("subBox"); renderSubUi(); showUi(); };
+function renderSubUi(){
+  const amHost = isHost(), hostHas = !!(room && room.subs && room.subs.text), has = !!subEl;
+  let info = "No subtitles";
+  if (has) info = (subLocal ? "Your subtitles: " : "From host: ") + (subName || "subtitles") + (subLocal && amHost && hostHas ? " · shared with everyone" : "");
+  else if (!amHost && hostHas && subIgnoreKey) info = "Host's subtitles are hidden for you";
+  $("subInfo").textContent = info;
+  $("subBoxInfo").textContent = info + (has && !subsOn ? " (off)" : "");
+  const dis = (id, on) => { $(id).style.display = on ? "" : "none"; };
+  const me = has && !amHost, all = !!code && canControl() && (has || hostHas), showHost = !amHost && hostHas && !!subIgnoreKey;
+  dis("subClearMe", me); dis("subClearMe2", me);
+  dis("subClearAll", all); dis("subClearAll2", all);
+  dis("subShow", showHost); dis("subShow2", showHost);
+  $("subToggle").disabled = !has; $("subToggle").textContent = subsOn ? "Turn off" : "Turn on";
+}
 
 /* brightness: dims or brightens the picture (a web page cannot change the phone's own screen brightness) */
 function applyBr(v){
@@ -588,14 +768,17 @@ function applyVol(p){
   g.gain.value = p / 100; $("volVal").textContent = p + "%";
 }
 $("volRange").oninput = e => applyVol(e.target.value);
-document.querySelectorAll(".brOpen").forEach(b => b.onclick = e => { e.stopPropagation(); $("brBox").classList.toggle("on"); $("plist").classList.remove("on"); });
-document.addEventListener("click", e => { if (!e.target.closest("#brBox,.brOpen")) $("brBox").classList.remove("on"); });
+document.querySelectorAll(".brOpen").forEach(b => b.onclick = e => { e.stopPropagation(); togglePop("brBox"); });
 
+/* small pop-over panels in the player: only one is open at a time */
+const POPS = ["brBox", "plist", "subBox"];
+function togglePop(id){ const el = $(id), was = el.classList.contains("on"); POPS.forEach(p => $(p).classList.remove("on")); if (!was) el.classList.add("on"); return !was; }
+document.addEventListener("click", e => { if (!e.target.closest("#brBox,#plist,#subBox,.brOpen,#ppl,#ccBtn")) POPS.forEach(p => $(p).classList.remove("on")); });
 /* people list */
 $("ppl").onclick = e => {
   e.stopPropagation();
+  if (!togglePop("plist")) return;
   const box = $("plist");
-  if (box.classList.contains("on")) { box.classList.remove("on"); return; }
   box.innerHTML = "";
   for (const p of people){
     const d = document.createElement("div");
@@ -603,9 +786,7 @@ $("ppl").onclick = e => {
     const sm = document.createElement("small"); sm.textContent = personStatus(p); d.appendChild(sm);
     box.appendChild(d);
   }
-  box.classList.add("on");
 };
-document.addEventListener("click", e => { if (!e.target.closest("#ppl,#plist")) $("plist").classList.remove("on"); });
 
 /* Same rules as the Android app: host's file is the reference; guests compare by length.
    (A browser can't hash a multi-GB file, so identical-hash matches are never claimed here.) */
@@ -641,7 +822,9 @@ function personStatus(p){
 }
 function renderLobby(){
   if (!code) return;
-  const box = $("people"); box.innerHTML = "";
+  const box = $("people");
+  const psig = [myId, isHost(), started(), room.mode, controlAll].concat(people.map(p => [p.id, p.name, p.host, p.online, p.verified, p.ready, p.match, p.via, controllers.has(p.id)].join(":"))).join("|");
+  if (psig !== lobbySig){ lobbySig = psig; box.innerHTML = "";
   for (const p of people){
     const row = document.createElement("div"); row.className = "person";
     const col = p.online ? ((p.ready || started()) ? "var(--accent)" : "var(--warn)") : "#666";
@@ -655,6 +838,7 @@ function renderLobby(){
       row.appendChild(b);
     }
     box.appendChild(row);
+  }
   }
   $("ctlAll").style.display = isHost() ? "block" : "none";
   $("ctlAll").textContent = controlAll ? "✓ Everyone can control (tap to stop)" : "Give control to everyone";
@@ -687,6 +871,7 @@ function renderLobby(){
   }
   $("ppl").textContent = "👥 " + online.length;
   renderStreamCard();
+  renderSubUi();
 }
 $("main").onclick = () => {
   if (isHost() && !started() && room.mode !== "stream" && lastAllReady){ sendCmd("play", 0); }
@@ -1100,84 +1285,361 @@ $("vfs").onclick = () => {
   else if (rv.webkitEnterFullscreen) rv.webkitEnterFullscreen();
 };
 
-/* ================= chat (messages live at rooms/<code>/chat, newest last) ================= */
+/* ================= chat =================
+   rooms/<code>/chat/<key> = {n:name, i:userId, m:text, c:key, t:serverTime, r:{<userId>:"emoji"}}
+   - chat has its own live connection, so it never waits behind subtitles / stream data on the main one
+   - the message key is made on this phone, so a retry can never post a duplicate
+   - a message shows at once (faded) and turns solid when the server has it; a failed one can be tapped to retry
+   - long-press a message: react, copy, delete your own */
+const QUICK = ["❤️","😂","😮","😢","👍","🔥"];
+const EMOJIS = [...new Set("😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😋 😜 🤪 😎 🤓 🥳 😏 😒 😞 😔 😟 😕 🙁 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 😶 😐 😑 😬 🙄 😯 😦 😮 😲 🥱 😴 🤤 😪 😵 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👿 💀 👻 👽 🤖 💩 🙈 🙉 🙊 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💖 💯 💥 🔥 ✨ ⭐ 🎉 🎊 👍 👎 👏 🙌 🙏 🤝 👌 ✌️ 🤞 🤟 🤘 👋 💪 🍿 🎬 🎥".split(" "))];
 let autoStreamKey = null, chatOpen = false, chatSeen = new Set(), chatReady = false, unread = 0;
-const chatList = () => {
-  const seenC = new Set();
-  return Object.entries(room.chat || {}).filter(([k,m]) => m && m.m).sort((a,b) => a[0] < b[0] ? -1 : 1)
-    .filter(([k,m]) => { if (!m.c) return true; if (seenC.has(m.c)) return false; seenC.add(m.c); return true; }).slice(-80);
-};
-let pendingChat = [];
-function refreshChatUi(){ if (chatOpen) renderChatLog(chatList()); }
-function chatPost(p){
-  const body = JSON.stringify({n:nick || "Guest", i:myId, m:p.m, c:p.c, t:SV});
-  let tries = 0; p.state = "sending";
-  const go = async () => {
-    tries++;
-    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+let forceStick = false, jumpN = 0, lastResync = 0, pruning = false, menuAt = 0, gridKey = null, gridBuilt = false, cpopT = null, fabT = null;
+let chatCur = new Map();
+const outbox = new Map(), tomb = new Set(), chatEls = new Map(), kq = new Map();
+const chatLogEl = $("chatLog");
+
+const tfmt = t => { try{ return new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }catch(_){ return ""; } };
+const nameColor = n => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) % 360; return "hsl(" + h + " 70% 72%)"; };
+const rsig = r => r ? Object.entries(r).sort().map(e => e.join("=")).join(",") : "";
+function groupReacts(r){
+  const g = new Map();
+  if (r) for (const [u, e] of Object.entries(r)){
+    if (typeof e !== "string") continue;
+    const o = g.get(e) || {e, n:0, mine:false}; o.n++; if (u === myId) o.mine = true; g.set(e, o);
+  }
+  return [...g.values()].sort((a, b) => b.n - a.n || (a.e < b.e ? -1 : 1));
+}
+function resetChat(){
+  chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false; forceStick = false; jumpN = 0; pruning = false;
+  outbox.clear(); tomb.clear(); chatEls.clear(); kq.clear(); chatCur = new Map();
+  $("chat").classList.remove("on"); $("msgMenu").classList.remove("on"); $("mmGrid").classList.remove("on"); $("msgMenu").classList.remove("grid");
+  chatLogEl.innerHTML = ""; $("chatJump").style.display = "none"; $("chatEmpty").style.display = "flex";
+  setBadge();
+}
+
+/* ---- a request that retries by itself; sends are PUTs to a key made here, so repeating them is safe ---- */
+async function chatReq(method, path, body, tries){
+  const c0 = code;
+  for (let i = 1; i <= tries; i++){
+    if (!code || code !== c0) return false;
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 7000);
     try{
-      const r = await fetch(url(`rooms/${code}/chat`), {method:"POST", body, signal:ac.signal});
-      clearTimeout(to); if (!r.ok) throw new Error("http");
-      p.state = "sent"; p.at = Date.now();
-    }catch(_){
+      const r = await fetch(url(path), {method, body: body === undefined ? undefined : JSON.stringify(body), signal: ac.signal});
       clearTimeout(to);
-      if (tries < 4){ await new Promise(r => setTimeout(r, 800 * tries)); return go(); }
-      p.state = "failed";
-    }
-    refreshChatUi();
-  };
-  return go();
-}
-let fabT = null;
-function notifyChat(text){ const t = $("fabToast"); t.textContent = text; t.style.display = "block"; clearTimeout(fabT); fabT = setTimeout(()=>{ t.style.display = "none"; }, 4500); }
-function setBadge(){ $("chatFab").classList.toggle("has", unread > 0); $("fabDot").textContent = unread > 9 ? "9+" : unread; if (!unread) $("fabToast").style.display = "none";
-  for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).textContent = unread ? "💬 " + unread : "💬" + (id === "chatBtnL" ? " Chat" : ""); }
-function renderChatLog(list){
-  const log = $("chatLog"); log.innerHTML = "";
-  for (const [k,m] of list){
-    const d = document.createElement("div"); d.className = "cm";
-    const b = document.createElement("b"); b.textContent = (m.i === myId ? "You" : (m.n || "Guest")) + ": ";
-    if (m.i === myId) b.style.color = "#8fd4ff";
-    d.appendChild(b); d.appendChild(document.createTextNode(m.m)); log.appendChild(d);
+      if (r.ok) return true;
+      if (r.status === 401 || r.status === 403) return false;
+    }catch(_){ clearTimeout(to); }
+    await new Promise(r => setTimeout(r, 500 * i));
   }
-  for (const p of pendingChat){
-    if (list.some(([k,m]) => m.c === p.c)) continue;
-    const d = document.createElement("div"); d.className = "cm"; d.style.opacity = ".6";
-    const b = document.createElement("b"); b.textContent = "You: "; b.style.color = "#8fd4ff";
-    d.appendChild(b); d.appendChild(document.createTextNode(p.m + (p.state === "sending" ? "  ⏳" : p.state === "failed" ? "  ⚠ not sent - tap to retry" : "")));
-    if (p.state === "failed") d.onclick = () => { chatPost(p); refreshChatUi(); };
-    log.appendChild(d);
-  }
-  log.scrollTop = log.scrollHeight;
+  return false;
 }
+/* everything that touches one message (send, react, delete) runs in order for that message, different messages run in parallel */
+function keyOp(k, fn){
+  const p = (kq.get(k) || Promise.resolve()).then(() => fn()).catch(() => false);
+  kq.set(k, p);
+  p.then(() => { if (kq.get(k) === p) kq.delete(k); });
+  return p;
+}
+
+/* ---- live connection just for chat ---- */
+function openChatStream(){
+  if (ces){ try{ ces.close(); }catch(_){} ces = null; }
+  if (!code) return;
+  lastChatEvt = Date.now();
+  const me = ces = new EventSource(url(`rooms/${code}/chat`));
+  me.onerror = () => { if (me === ces && me.readyState === 2) setTimeout(() => { if (code && me === ces) openChatStream(); }, 2000); };
+  me.addEventListener("keep-alive", () => { lastChatEvt = Date.now(); });
+  me.addEventListener("put", e => {
+    lastChatEvt = Date.now();
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    room.chat = applyAt(room.chat || {}, d.path, d.data);
+    chatUpdate();
+  });
+  me.addEventListener("patch", e => {
+    lastChatEvt = Date.now();
+    let d; try{ d = JSON.parse(e.data); }catch(_){ return; }
+    for (const k in d.data) room.chat = applyAt(room.chat || {}, (d.path === "/" ? "" : d.path) + "/" + k, d.data[k]);
+    chatUpdate();
+  });
+}
+/* if a message we sent hasn't come back through the live connection, fetch the chat once and reconnect */
+async function chatResync(){
+  const t = Date.now(); if (!code || t - lastResync < 3000) return;
+  lastResync = t;
+  const c0 = code;
+  try{ const d = await getJson(`rooms/${code}/chat`); if (c0 !== code) return; room.chat = (d && typeof d === "object") ? d : {}; chatUpdate(); }catch(_){}
+  if (c0 === code) openChatStream();
+}
+
+/* ---- what is on screen ---- */
+function chatItems(){
+  const ch = room.chat || {}, arr = [], seenC = new Set();
+  for (const k in ch){
+    const m = ch[k];
+    if (!m || typeof m !== "object" || !m.m || tomb.has(k)) continue;
+    arr.push({k, i:m.i, n:m.n, m:String(m.m), t:+m.t || 0, r:(m.r && typeof m.r === "object") ? m.r : null, c:m.c, state:"ok", confirmed:true});
+  }
+  arr.sort((a, b) => (a.t - b.t) || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0));
+  const out = arr.filter(it => { if (!it.c) return true; if (seenC.has(it.c)) return false; seenC.add(it.c); return true; });
+  const pend = [];
+  for (const o of outbox.values()) if (!(ch[o.k] && ch[o.k].m) && !tomb.has(o.k)) pend.push({k:o.k, i:myId, n:nick || "Guest", m:o.m, t:o.ts, r:null, c:o.k, state:o.state, confirmed:false});
+  pend.sort((a, b) => a.t - b.t);
+  return out.concat(pend).slice(-80);
+}
+function mkRow(k){
+  const row = document.createElement("div"); row.className = "mrow"; row.dataset.k = k;
+  const nm = document.createElement("div"); nm.className = "mname";
+  const mb = document.createElement("div"); mb.className = "mb";
+  const tx = document.createElement("div"); tx.className = "mt";
+  const mm = document.createElement("div"); mm.className = "mm";
+  mb.appendChild(tx); mb.appendChild(mm);
+  const rx = document.createElement("div"); rx.className = "rx";
+  row.appendChild(nm); row.appendChild(mb); row.appendChild(rx);
+  return {row, nm, tx, mm, rx, sig:""};
+}
+function fillRow(rec, it, first, mine){
+  rec.row.className = "mrow " + (mine ? "mine" : "other") + (first ? " first" : "") + (it.state === "sending" ? " sending" : it.state === "failed" ? " failed" : "");
+  const showName = !mine && first;
+  rec.nm.style.display = showName ? "block" : "none";
+  if (showName){ rec.nm.textContent = it.n || "Guest"; rec.nm.style.color = nameColor(it.n || "Guest"); }
+  rec.tx.textContent = it.m;
+  rec.mm.textContent = tfmt(it.t) + (mine ? (it.state === "sending" ? "  ⏳" : it.state === "failed" ? "  ⚠ not sent · tap to retry" : "  ✓") : "");
+  rec.rx.textContent = "";
+  for (const g of groupReacts(it.r)){
+    const c = document.createElement("span"); c.className = "rxc" + (g.mine ? " mine" : ""); c.dataset.e = g.e;
+    c.textContent = g.e + (g.n > 1 ? " " + g.n : ""); rec.rx.appendChild(c);
+  }
+}
+/* updates the existing rows in place (nothing is rebuilt), so a long-press is never interrupted by an incoming event */
+function chatRender(items){
+  items = items || chatItems();
+  const log = chatLogEl;
+  const near = log.scrollHeight - log.scrollTop - log.clientHeight < 90;
+  chatCur = new Map(items.map(it => [it.k, it]));
+  let freshMine = false, freshOthers = 0;
+  for (const it of items) if (!chatEls.has(it.k)){ if (it.i === myId) freshMine = true; else freshOthers++; }
+  const keep = new Set(); let prev = null, idx = 0;
+  for (const it of items){
+    const mine = it.i === myId;
+    const first = !prev || prev.i !== it.i || Math.abs(it.t - prev.t) > 120000;
+    const sig = [it.i, it.n, it.m, it.state, first ? 1 : 0, tfmt(it.t), rsig(it.r), mine ? 1 : 0].join("\u0001");
+    let rec = chatEls.get(it.k);
+    if (!rec){ rec = mkRow(it.k); chatEls.set(it.k, rec); }
+    if (rec.sig !== sig){ rec.sig = sig; fillRow(rec, it, first, mine); }
+    keep.add(it.k);
+    if (log.children[idx] !== rec.row) log.insertBefore(rec.row, log.children[idx] || null);
+    idx++; prev = it;
+  }
+  for (const [k, rec] of chatEls) if (!keep.has(k)){ rec.row.remove(); chatEls.delete(k); }
+  $("chatEmpty").style.display = items.length ? "none" : "flex";
+  if (forceStick || freshMine || near){ log.scrollTop = log.scrollHeight; jumpN = 0; $("chatJump").style.display = "none"; }
+  else if (freshOthers){ jumpN += freshOthers; const j = $("chatJump"); j.textContent = "↓ " + jumpN + " new"; j.style.display = "block"; }
+  forceStick = false;
+}
+const refreshChatUi = () => { if (chatOpen) chatRender(); };
+function chatHeader(){ $("chatSub").textContent = people.filter(p => p.online).length + " online"; }
+
+/* called whenever the chat data changes */
 function chatUpdate(){
   if (!code) return;
-  const list = chatList();
-  for (const [k,m] of list){
-    if (chatSeen.has(k)) continue; chatSeen.add(k);
-    if (chatReady && m.i !== myId && !chatOpen){ unread++; notifyChat((m.n || "Guest") + ": " + m.m.slice(0, 60)); }
+  const ch = room.chat || {};
+  for (const k of [...outbox.keys()]) if (ch[k] && ch[k].m) outbox.delete(k);     // the server has it now
+  const items = chatItems();
+  for (const it of items){
+    if (chatSeen.has(it.k)) continue; chatSeen.add(it.k);
+    if (chatReady && it.i !== myId && !chatOpen){ unread++; notifyChat((it.n || "Guest") + ": " + it.m.slice(0, 60)); }
   }
   chatReady = true;
-  pendingChat = pendingChat.filter(p => !list.some(([k,m]) => m.c === p.c) && !(p.state === "sent" && Date.now() - p.at > 20000));
-  if (chatOpen){ unread = 0; renderChatLog(list); }
-  setBadge();
+  if (chatOpen){ unread = 0; chatRender(items); }
+  setBadge(); chatHeader(); pruneMaybe(ch);
+}
+/* the host keeps the chat short so everyone's connection stays light */
+function pruneMaybe(ch){
+  if (pruning || !isHost()) return;
+  const ks = Object.keys(ch); if (ks.length < 220) return;
+  ks.sort((a, b) => ((ch[a] && +ch[a].t) || 0) - ((ch[b] && +ch[b].t) || 0));
+  const patch = {}; ks.slice(0, ks.length - 140).forEach(k => patch[k] = null);
+  pruning = true;
+  chatReq("PATCH", `rooms/${code}/chat`, patch, 2).then(() => { pruning = false; });
+}
+
+/* ---- send / retry / delete / react ---- */
+function sendChat(text){
+  const n = nowSrv(), ts = Math.floor(n == null ? Date.now() : n);
+  const k = "m" + ts.toString(36).padStart(9, "0") + Math.random().toString(36).slice(2, 5);
+  const o = {k, m:text, ts, state:"sending", deleted:false};
+  outbox.set(k, o); forceStick = true; sendOne(o);
+}
+function sendOne(o){
+  o.state = "sending"; refreshChatUi();
+  return keyOp(o.k, async () => {
+    if (o.deleted || !code) return false;
+    const ok = await chatReq("PUT", `rooms/${code}/chat/${o.k}`, {n: nick || "Guest", i: myId, m: o.m, c: o.k, t: SV}, 4);
+    if (o.deleted) return false;
+    o.state = ok ? "sent" : "failed";
+    refreshChatUi();
+    if (ok) setTimeout(() => { if (code && !(room.chat && room.chat[o.k]) && !tomb.has(o.k)) chatResync(); }, 2500);
+    return ok;
+  });
+}
+function retrySend(k){ const o = outbox.get(k); if (o) sendOne(o); }
+function deleteMsg(k){
+  const it = chatCur.get(k); if (!it || it.i !== myId) return;
+  const o = outbox.get(k); if (o){ o.deleted = true; outbox.delete(k); }
+  tomb.add(k); refreshChatUi(); cpop("Message deleted");
+  keyOp(k, () => chatReq("DELETE", `rooms/${code}/chat/${k}`, undefined, 4)).then(ok => {
+    if (!ok){ tomb.delete(k); refreshChatUi(); cpop("Could not delete - try again"); }
+  });
+}
+function react(k, emoji){
+  const m = room.chat && room.chat[k]; if (!m || !m.m || !code) return;
+  const cur = (m.r && m.r[myId]) || null, next = cur === emoji ? null : emoji;
+  const path = `rooms/${code}/chat/${k}/r/${myId}`;
+  room.chat = applyAt(room.chat, `/${k}/r/${myId}`, next);          // shows at once
+  refreshChatUi();
+  keyOp(k, () => chatReq(next ? "PUT" : "DELETE", path, next || undefined, 3)).then(ok => {
+    if (!ok && room.chat && room.chat[k]){ room.chat = applyAt(room.chat, `/${k}/r/${myId}`, cur); refreshChatUi(); cpop("Reaction not sent"); }
+  });
+}
+
+/* ---- long-press menu ---- */
+function cpop(t){ const el = $("cpop"); el.textContent = t; el.style.display = "block"; clearTimeout(cpopT); cpopT = setTimeout(() => { el.style.display = "none"; }, 2000); }
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); cpop("Copied"); }
+  catch(_){
+    try{ const ta = document.createElement("textarea"); ta.value = t; ta.style.cssText = "position:fixed;opacity:0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); cpop("Copied"); }
+    catch(__){ cpop("Could not copy"); }
+  }
+}
+function closeMsgMenu(){ const ov = $("msgMenu"); ov.classList.remove("on"); ov.classList.remove("grid"); $("mmGrid").classList.remove("on"); }
+function emojiBtn(e, sel, fn){ const b = document.createElement("button"); b.type = "button"; b.textContent = e; if (sel) b.className = "sel"; b.onclick = fn; return b; }
+function openMsgMenu(k){
+  const rec = chatEls.get(k), it = chatCur.get(k); if (!rec || !it) return;
+  const mine = it.i === myId;
+  const ov = $("msgMenu"), box = $("mmBox"), bar = $("mmBar"), acts = $("mmActions"), cl = $("mmClone");
+  box.className = mine ? "mine" : "other";
+  bar.innerHTML = ""; bar.style.display = it.confirmed ? "flex" : "none";
+  const mineR = it.r && it.r[myId];
+  for (const e of QUICK) bar.appendChild(emojiBtn(e, mineR === e, () => { closeMsgMenu(); react(k, e); }));
+  const plus = emojiBtn("＋", false, () => openGrid(k)); plus.className = "plus"; bar.appendChild(plus);
+  cl.innerHTML = "";
+  const w = document.createElement("div"); w.className = "mrow clone " + (mine ? "mine" : "other");
+  w.appendChild(rec.row.querySelector(".mb").cloneNode(true)); cl.appendChild(w);
+  acts.innerHTML = "";
+  const act = (label, ico, fn, del) => {
+    const b = document.createElement("button"); b.type = "button"; if (del) b.className = "del";
+    const a = document.createElement("span"); a.textContent = label; const c = document.createElement("span"); c.textContent = ico;
+    b.appendChild(a); b.appendChild(c); b.onclick = () => { closeMsgMenu(); fn(); }; acts.appendChild(b);
+  };
+  act("Copy", "⧉", () => copyText(it.m));
+  if (mine && it.state === "failed") act("Retry", "↻", () => retrySend(k));
+  if (mine) act("Delete", "🗑", () => deleteMsg(k), true);
+  menuAt = Date.now();
+  box.style.visibility = "hidden"; ov.classList.remove("grid"); $("mmGrid").classList.remove("on"); ov.classList.add("on");
+  const cr = $("chat").getBoundingClientRect(), br = rec.row.querySelector(".mb").getBoundingClientRect();
+  const barH = it.confirmed ? bar.offsetHeight + 8 : 0;
+  let top = br.top - cr.top - barH;
+  top = Math.max(8, Math.min(top, cr.height - box.offsetHeight - 8));
+  box.style.top = top + "px"; box.style.visibility = "";
+}
+function openGrid(k){
+  gridKey = k;
+  const body = $("mmGridBody");
+  if (!gridBuilt){
+    gridBuilt = true;
+    for (const e of EMOJIS){ const b = document.createElement("button"); b.type = "button"; b.textContent = e; b.dataset.e = e; body.appendChild(b); }
+    body.addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const k2 = gridKey; closeMsgMenu(); react(k2, b.dataset.e); });
+  }
+  $("msgMenu").classList.add("grid"); $("mmGrid").classList.add("on");
+}
+$("mmGridClose").onclick = closeMsgMenu;
+$("msgMenu").addEventListener("click", e => { if (Date.now() - menuAt < 250) return; if (e.target === $("msgMenu")) closeMsgMenu(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if ($("msgMenu").classList.contains("on")) closeMsgMenu(); else if (chatOpen) toggleChat(false); });
+
+/* long-press a bubble = menu, double-tap = ❤️, tap a failed one = retry, tap a reaction = add/remove yours */
+const LP = {t:null, k:null, x:0, y:0, fired:false, lastTap:0, lastK:null};
+chatLogEl.addEventListener("pointerdown", e => {
+  if (e.button !== 0) return;
+  const mb = e.target.closest(".mb"); if (!mb) return;
+  const row = mb.closest(".mrow"); if (!row) return;
+  LP.k = row.dataset.k; LP.x = e.clientX; LP.y = e.clientY; LP.fired = false;
+  clearTimeout(LP.t);
+  LP.t = setTimeout(() => {
+    LP.t = null; if (LP.fired) return; LP.fired = true;
+    try{ if (navigator.vibrate) navigator.vibrate(14); }catch(_){}
+    openMsgMenu(LP.k);
+  }, 380);
+});
+chatLogEl.addEventListener("pointermove", e => {
+  if (LP.t && (Math.abs(e.clientX - LP.x) > 9 || Math.abs(e.clientY - LP.y) > 9)){ clearTimeout(LP.t); LP.t = null; }
+});
+chatLogEl.addEventListener("pointerup", () => {
+  if (!LP.t) return;
+  clearTimeout(LP.t); LP.t = null;
+  onTapMsg(LP.k);
+});
+chatLogEl.addEventListener("pointercancel", () => { clearTimeout(LP.t); LP.t = null; });
+chatLogEl.addEventListener("contextmenu", e => {
+  const mb = e.target.closest(".mb"); if (!mb) return;
+  e.preventDefault(); clearTimeout(LP.t); LP.t = null;
+  if (!LP.fired){ LP.fired = true; openMsgMenu(mb.closest(".mrow").dataset.k); }
+});
+chatLogEl.addEventListener("click", e => {
+  const c = e.target.closest(".rxc"); if (!c) return;
+  const row = c.closest(".mrow"); if (row) react(row.dataset.k, c.dataset.e);
+});
+function onTapMsg(k){
+  const it = chatCur.get(k); if (!it) return;
+  if (it.state === "failed" && it.i === myId){ retrySend(k); return; }
+  const now = Date.now();
+  if (LP.lastK === k && now - LP.lastTap < 320){
+    LP.lastTap = 0;
+    if (it.confirmed && !(it.r && it.r[myId] === "❤️")) react(k, "❤️");
+    return;
+  }
+  LP.lastK = k; LP.lastTap = now;
+}
+chatLogEl.addEventListener("scroll", () => {
+  const l = chatLogEl;
+  if (l.scrollHeight - l.scrollTop - l.clientHeight < 90){ jumpN = 0; $("chatJump").style.display = "none"; }
+}, {passive:true});
+$("chatJump").onclick = () => { chatLogEl.scrollTop = chatLogEl.scrollHeight; };
+
+/* ---- chat button, badge, input ---- */
+function notifyChat(text){ const t = $("fabToast"); t.textContent = text; t.style.display = "block"; clearTimeout(fabT); fabT = setTimeout(() => { t.style.display = "none"; }, 4500); }
+function setBadge(){
+  $("chatFab").classList.toggle("has", unread > 0); $("fabDot").textContent = unread > 9 ? "9+" : unread;
+  if (!unread) $("fabToast").style.display = "none";
+  for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).textContent = unread ? "💬 " + unread : "💬" + (id === "chatBtnL" ? " Chat" : "");
 }
 function toggleChat(open){
   chatOpen = open === undefined ? !chatOpen : open;
   $("chat").classList.toggle("on", chatOpen);
-  if (chatOpen){ unread = 0; renderChatLog(chatList()); setBadge(); }
+  if (!chatOpen){ closeMsgMenu(); try{ $("chatIn").blur(); }catch(_){} }
+  else { unread = 0; forceStick = true; chatHeader(); chatRender(); setBadge(); }
 }
+const sendBtnState = () => { $("chatSend").disabled = !$("chatIn").value.trim(); };
+$("chatIn").addEventListener("input", sendBtnState);
+$("chatIn").addEventListener("focus", () => setTimeout(() => { chatLogEl.scrollTop = chatLogEl.scrollHeight; }, 320));
 $("chatForm").addEventListener("submit", e => {
   e.preventDefault();
-  const t = $("chatIn").value.trim().slice(0, 300);
+  const inp = $("chatIn"), t = inp.value.trim().slice(0, 300);
   if (!t || !code) return;
-  $("chatIn").value = "";
-  const p = {c: myId + Date.now().toString(36), m: t, state: "sending"};
-  pendingChat.push(p); refreshChatUi(); chatPost(p);
+  inp.value = ""; sendBtnState();
+  sendChat(t);
+  try{ inp.focus(); }catch(_){}
 });
 $("chatFab").onclick = e => { e.stopPropagation(); toggleChat(); };
 for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).onclick = e => { e.stopPropagation(); toggleChat(); };
 $("chatClose").onclick = () => toggleChat(false);
+
+/* keep the chat box above the on-screen keyboard (iPhone does not shrink the page for it) */
+if (window.visualViewport){
+  const vv = window.visualViewport;
+  const upd = () => document.documentElement.style.setProperty("--kb", (vv.scale > 1.01 ? 0 : Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop))) + "px");
+  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd); upd();
+}
 
 /* show any unexpected error on screen instead of failing silently */
 window.addEventListener("error", e => { try{ pop("Error: " + (e.message || "unknown")); }catch(_){} });
