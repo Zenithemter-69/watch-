@@ -209,7 +209,14 @@
 </div>
 
 <div id="plist"></div>
-<div id="brBox"><div style="display:flex;align-items:center;gap:10px"><span>🔅</span><input type="range" id="brRange" min="50" max="300" value="100" style="flex:1"><span>🔆</span></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px"><span id="brVal">100%</span><button class="sec" id="brReset" style="width:auto;padding:6px 14px;font-size:13px">Reset</button></div></div>
+<div id="brBox">
+  <div style="font-size:12px;color:#9a9aa2;margin-bottom:4px">Brightness</div>
+  <div style="display:flex;align-items:center;gap:10px"><span>🔅</span><input type="range" id="brRange" min="50" max="300" value="100" style="flex:1"><span>🔆</span></div>
+  <div style="font-size:12px;color:#9a9aa2;margin:12px 0 4px">Volume boost <span id="volVal">100%</span></div>
+  <div style="display:flex;align-items:center;gap:10px"><span>🔈</span><input type="range" id="volRange" min="100" max="400" value="100" style="flex:1"><span>📢</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><span id="brVal">100%</span><button class="sec" id="brReset" style="width:auto;padding:6px 14px;font-size:13px">Reset</button></div>
+  <div style="font-size:11px;color:#9a9aa2;margin-top:8px">Boost above 100% can distort and is hard on speakers and ears. Go up slowly.</div>
+</div>
 
 <!-- CHAT (slides in from the right, over any screen) -->
 <button id="chatFab" aria-label="Chat">💬<span id="fabDot"></span></button>
@@ -534,7 +541,35 @@ function applyBr(v){
 }
 try{ applyBr(localStorage.getItem("wp_br") || 100); }catch(_){ applyBr(100); }
 $("brRange").oninput = e => applyBr(e.target.value);
-$("brReset").onclick = () => applyBr(100);
+$("brReset").onclick = () => { applyBr(100); $("volRange").value = 100; applyVol(100); };
+/* volume boost above 100% via Web Audio gain (with a limiter to reduce clipping); not available while hosting a live stream */
+const WA = {ctx:null, nodes:new Map()};
+function boostGain(el){
+  if (!WA.ctx){ const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; WA.ctx = new C(); }
+  let n = WA.nodes.get(el);
+  if (!n){
+    try{
+      const src = WA.ctx.createMediaElementSource(el), g = WA.ctx.createGain(), c = WA.ctx.createDynamicsCompressor();
+      c.threshold.value = -12; c.knee.value = 8; c.ratio.value = 12; c.attack.value = 0.003; c.release.value = 0.25;
+      src.connect(g); g.connect(c); c.connect(WA.ctx.destination);
+      n = {g}; WA.nodes.set(el, n);
+    }catch(ex){ return null; }
+  }
+  return n.g;
+}
+function applyVol(p){
+  p = Math.max(100, Math.min(400, +p || 100));
+  const el = $("viewer").classList.contains("on") ? $("rv") : $("vid");
+  if (p > 100 && typeof capStream !== "undefined" && capStream){
+    pop("Volume boost can't be used while you're hosting a stream"); $("volRange").value = 100; $("volVal").textContent = "100%"; return;
+  }
+  if (p === 100 && !WA.nodes.has(el)){ $("volVal").textContent = "100%"; return; }
+  const g = boostGain(el);
+  if (!g){ pop("Volume boost isn't supported in this browser"); $("volRange").value = 100; $("volVal").textContent = "100%"; return; }
+  try{ if (WA.ctx.state === "suspended") WA.ctx.resume(); }catch(_){}
+  g.gain.value = p / 100; $("volVal").textContent = p + "%";
+}
+$("volRange").oninput = e => applyVol(e.target.value);
 document.querySelectorAll(".brOpen").forEach(b => b.onclick = e => { e.stopPropagation(); $("brBox").classList.toggle("on"); $("plist").classList.remove("on"); });
 document.addEventListener("click", e => { if (!e.target.closest("#brBox,.brOpen")) $("brBox").classList.remove("on"); });
 
