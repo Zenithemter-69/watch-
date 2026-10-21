@@ -285,7 +285,12 @@ function pop(t){
 /* writes go out one after another so their order is kept */
 let wq = Promise.resolve();
 function write(method, path, body){
-  wq = wq.then(() => fetch(url(path), {method, body: body === undefined ? undefined : JSON.stringify(body)}).then(r=>r.ok)).catch(()=>false);
+  wq = wq.then(async () => {
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 10000);
+    try{ const r = await fetch(url(path), {method, body: body === undefined ? undefined : JSON.stringify(body), signal: ac.signal}); return r.ok; }
+    catch(_){ return false; }
+    finally{ clearTimeout(to); }
+  });
   return wq;
 }
 async function getJson(path){ const r = await fetch(url(path)); if (!r.ok) throw new Error("HTTP "+r.status); return r.json(); }
@@ -367,7 +372,7 @@ function cleanup(msg){
   if (es) es.close(); es = null;
   closeHostPeers(); closeViewerPeer(); capStream = null; streamWanted = false;
   $("viewer").classList.remove("on"); keepAwake(false);
-  autoStreamKey = null; chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false;
+  autoStreamKey = null; chatSeen = new Set(); chatReady = false; unread = 0; chatOpen = false; pendingChat = [];
   $("chat").classList.remove("on"); $("chatLog").innerHTML = ""; setBadge();
   timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
   clearInterval(cdTimer);
@@ -392,11 +397,18 @@ function heartbeat(){
 }
 
 /* ================= live stream (Firebase server-sent events) ================= */
+let lastEvt = Date.now();
+setInterval(() => { if (code && es && Date.now() - lastEvt > 50000){ lastEvt = Date.now(); openStream(); } }, 15000);
 function openStream(){
   if (es) es.close();
+  lastEvt = Date.now();
   es = new EventSource(url(`rooms/${code}`));
-  es.addEventListener("put",   e => { const d = JSON.parse(e.data); setAt(d.path, d.data); onRoom(); });
+  const mine = es;
+  es.onerror = () => { if (mine === es && es.readyState === 2) setTimeout(() => { if (code && mine === es) openStream(); }, 2000); };
+  es.addEventListener("keep-alive", () => { lastEvt = Date.now(); });
+  es.addEventListener("put",   e => { lastEvt = Date.now(); const d = JSON.parse(e.data); setAt(d.path, d.data); onRoom(); });
   es.addEventListener("patch", e => {
+    lastEvt = Date.now();
     const d = JSON.parse(e.data);
     for (const k in d.data) setAt((d.path === "/" ? "" : d.path) + "/" + k, d.data[k]);
     onRoom();
@@ -1086,7 +1098,32 @@ $("vfs").onclick = () => {
 
 /* ================= chat (messages live at rooms/<code>/chat, newest last) ================= */
 let autoStreamKey = null, chatOpen = false, chatSeen = new Set(), chatReady = false, unread = 0;
-const chatList = () => Object.entries(room.chat || {}).filter(([k,m]) => m && m.m).sort((a,b) => a[0] < b[0] ? -1 : 1).slice(-80);
+const chatList = () => {
+  const seenC = new Set();
+  return Object.entries(room.chat || {}).filter(([k,m]) => m && m.m).sort((a,b) => a[0] < b[0] ? -1 : 1)
+    .filter(([k,m]) => { if (!m.c) return true; if (seenC.has(m.c)) return false; seenC.add(m.c); return true; }).slice(-80);
+};
+let pendingChat = [];
+function refreshChatUi(){ if (chatOpen) renderChatLog(chatList()); }
+function chatPost(p){
+  const body = JSON.stringify({n:nick || "Guest", i:myId, m:p.m, c:p.c, t:SV});
+  let tries = 0; p.state = "sending";
+  const go = async () => {
+    tries++;
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+    try{
+      const r = await fetch(url(`rooms/${code}/chat`), {method:"POST", body, signal:ac.signal});
+      clearTimeout(to); if (!r.ok) throw new Error("http");
+      p.state = "sent"; p.at = Date.now();
+    }catch(_){
+      clearTimeout(to);
+      if (tries < 4){ await new Promise(r => setTimeout(r, 800 * tries)); return go(); }
+      p.state = "failed";
+    }
+    refreshChatUi();
+  };
+  return go();
+}
 let fabT = null;
 function notifyChat(text){ const t = $("fabToast"); t.textContent = text; t.style.display = "block"; clearTimeout(fabT); fabT = setTimeout(()=>{ t.style.display = "none"; }, 4500); }
 function setBadge(){ $("chatFab").classList.toggle("has", unread > 0); $("fabDot").textContent = unread > 9 ? "9+" : unread; if (!unread) $("fabToast").style.display = "none";
@@ -1099,6 +1136,14 @@ function renderChatLog(list){
     if (m.i === myId) b.style.color = "#8fd4ff";
     d.appendChild(b); d.appendChild(document.createTextNode(m.m)); log.appendChild(d);
   }
+  for (const p of pendingChat){
+    if (list.some(([k,m]) => m.c === p.c)) continue;
+    const d = document.createElement("div"); d.className = "cm"; d.style.opacity = ".6";
+    const b = document.createElement("b"); b.textContent = "You: "; b.style.color = "#8fd4ff";
+    d.appendChild(b); d.appendChild(document.createTextNode(p.m + (p.state === "sending" ? "  ⏳" : p.state === "failed" ? "  ⚠ not sent - tap to retry" : "")));
+    if (p.state === "failed") d.onclick = () => { chatPost(p); refreshChatUi(); };
+    log.appendChild(d);
+  }
   log.scrollTop = log.scrollHeight;
 }
 function chatUpdate(){
@@ -1109,6 +1154,7 @@ function chatUpdate(){
     if (chatReady && m.i !== myId && !chatOpen){ unread++; notifyChat((m.n || "Guest") + ": " + m.m.slice(0, 60)); }
   }
   chatReady = true;
+  pendingChat = pendingChat.filter(p => !list.some(([k,m]) => m.c === p.c) && !(p.state === "sent" && Date.now() - p.at > 20000));
   if (chatOpen){ unread = 0; renderChatLog(list); }
   setBadge();
 }
@@ -1122,7 +1168,8 @@ $("chatForm").addEventListener("submit", e => {
   const t = $("chatIn").value.trim().slice(0, 300);
   if (!t || !code) return;
   $("chatIn").value = "";
-  write("POST", `rooms/${code}/chat`, {n:nick || "Guest", i:myId, m:t, t:SV});
+  const p = {c: myId + Date.now().toString(36), m: t, state: "sending"};
+  pendingChat.push(p); refreshChatUi(); chatPost(p);
 });
 $("chatFab").onclick = e => { e.stopPropagation(); toggleChat(); };
 for (const id of ["chatBtnL","chatBtnP","chatBtnV"]) $(id).onclick = e => { e.stopPropagation(); toggleChat(); };
