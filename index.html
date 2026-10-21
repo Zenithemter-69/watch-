@@ -36,6 +36,8 @@
   #player{position:fixed;inset:0;background:#000;display:none;z-index:5}
   #player.on{display:block}
   video::cue{font-size:clamp(14px,3.6vw,26px);background:rgba(0,0,0,.65);color:#fff}
+  #brBox{position:fixed;top:60px;right:12px;width:min(260px,80vw);background:#0E0E10f2;border:1px solid #2a2a2e;border-radius:14px;padding:12px 14px;z-index:9;display:none;font-size:14px}
+  #brBox.on{display:block}
   #plist{position:fixed;top:60px;right:12px;min-width:220px;max-width:86vw;background:#0E0E10f2;border:1px solid #2a2a2e;border-radius:14px;padding:12px 14px;z-index:9;display:none;font-size:14px}
   #plist.on{display:block}
   #plist div{padding:5px 0}
@@ -61,12 +63,14 @@
   #vbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;background:linear-gradient(#000a,#0000)}
   #vbar .t{flex:1;font-size:13px}
   #tap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:18px 28px;display:none;font-size:18px}
-  #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10ee;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
-  #chat.on{display:flex}
+  #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
+  #chat.on{display:flex;touch-action:pan-y}
+  body:has(#chat.on){overflow:hidden}
+  body:has(#chat.on):has(#player.on), body:has(#chat.on):has(#viewer.on){background:#000}
   /* chat opens beside / under the video instead of covering it */
   @media (orientation:landscape){
-    #chat{width:min(300px,38vw)}
-    body:has(#chat.on) #player, body:has(#chat.on) #viewer{right:min(300px,38vw)}
+    #chat{width:min(250px,32vw)}
+    body:has(#chat.on) #player, body:has(#chat.on) #viewer{right:min(250px,32vw)}
   }
   @media (orientation:portrait){
     #chat{top:auto;left:0;width:auto;height:46%;border-left:0;border-top:1px solid #2a2a2e;padding-top:0}
@@ -80,7 +84,7 @@
   body:has(#player.on) #chatFab, body:has(#viewer.on) #chatFab{display:flex}
   body:has(#chat.on) #chatFab, body:has(#chat.on) #fabToast{display:none !important}
   #chatHead{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
-  #chatLog{flex:1;overflow-y:auto;padding:6px 12px;-webkit-overflow-scrolling:touch}
+  #chatLog{flex:1;min-height:0;overscroll-behavior:contain;overflow-y:auto;padding:6px 12px;-webkit-overflow-scrolling:touch}
   .cm{margin-bottom:8px;font-size:14px;line-height:1.35;word-wrap:break-word;overflow-wrap:anywhere}
   .cm b{color:var(--accent)}
   #chatForm{display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
@@ -182,6 +186,7 @@
       <button class="chip sec" id="back">‹ Back</button>
       <div class="t" id="title"></div>
       <button class="chip sec" id="audBtn">🔊</button>
+      <button class="chip sec brOpen" id="brBtn">🔆</button>
       <button class="chip sec" id="ccBtn">CC</button>
       <button class="chip sec" id="chatBtnP">💬</button>
       <button class="chip sec" id="ppl">👥 1</button>
@@ -201,6 +206,7 @@
 </div>
 
 <div id="plist"></div>
+<div id="brBox"><div style="display:flex;align-items:center;gap:10px"><span>🔅</span><input type="range" id="brRange" min="50" max="220" value="100" style="flex:1"><span>🔆</span></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px"><span id="brVal">100%</span><button class="sec" id="brReset" style="width:auto;padding:6px 14px;font-size:13px">Reset</button></div></div>
 
 <!-- CHAT (slides in from the right, over any screen) -->
 <button id="chatFab" aria-label="Chat">💬<span id="fabDot"></span></button>
@@ -222,6 +228,7 @@
   <div id="vbar">
     <button class="chip sec" id="vback">‹ Back</button>
     <div class="t" id="vstatus">Connecting…</div>
+    <button class="chip sec brOpen" id="brBtnV">🔆</button>
     <button class="chip sec" id="chatBtnV">💬</button>
     <button class="chip sec" id="vretry">↻</button>
     <button class="chip sec" id="vfs">⛶</button>
@@ -513,6 +520,20 @@ $("ccBtn").onclick = () => {
   pop(any ? (subsOn ? "Subtitles on" : "Subtitles off") : "No subtitles loaded. Add a .srt file in the lobby.");
   showUi();
 };
+
+/* brightness: dims or brightens the picture (a web page cannot change the phone's own screen brightness) */
+function applyBr(v){
+  v = Math.max(50, Math.min(220, +v || 100));
+  const f = v === 100 ? "" : "brightness(" + (v / 100) + ")";
+  $("vid").style.filter = f; $("rv").style.filter = f;
+  $("brRange").value = v; $("brVal").textContent = v + "%";
+  try{ localStorage.setItem("wp_br", v); }catch(_){}
+}
+try{ applyBr(localStorage.getItem("wp_br") || 100); }catch(_){ applyBr(100); }
+$("brRange").oninput = e => applyBr(e.target.value);
+$("brReset").onclick = () => applyBr(100);
+document.querySelectorAll(".brOpen").forEach(b => b.onclick = e => { e.stopPropagation(); $("brBox").classList.toggle("on"); $("plist").classList.remove("on"); });
+document.addEventListener("click", e => { if (!e.target.closest("#brBox,.brOpen")) $("brBox").classList.remove("on"); });
 
 /* people list */
 $("ppl").onclick = e => {
