@@ -63,6 +63,15 @@
   #tap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:18px 28px;display:none;font-size:18px}
   #chat{position:fixed;top:0;right:0;bottom:0;width:min(330px,86vw);background:#0E0E10ee;z-index:8;display:none;flex-direction:column;border-left:1px solid #2a2a2e;padding-top:env(safe-area-inset-top)}
   #chat.on{display:flex}
+  /* chat opens beside / under the video instead of covering it */
+  @media (orientation:landscape){
+    #chat{width:min(300px,38vw)}
+    body:has(#chat.on) #player, body:has(#chat.on) #viewer{right:min(300px,38vw)}
+  }
+  @media (orientation:portrait){
+    #chat{top:auto;left:0;width:auto;height:46%;border-left:0;border-top:1px solid #2a2a2e;padding-top:0}
+    body:has(#chat.on) #player, body:has(#chat.on) #viewer{bottom:46%}
+  }
   #chatFab{position:fixed;right:10px;top:46%;width:46px;height:46px;border-radius:50%;padding:0;background:#000b;border:1px solid #ffffff40;font-size:20px;z-index:7;display:none;align-items:center;justify-content:center;opacity:.55;width:46px;margin:0}
   #chatFab.has{opacity:1;border-color:#ff4d5e}
   #fabDot{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#ff3b4e;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;padding:0 4px;display:none}
