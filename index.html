@@ -12,6 +12,9 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif}
   .screen{display:none;min-height:100%;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
   .screen.on{display:block}
+  body:has(#player.on) .screen, body:has(#viewer.on) .screen{display:none !important}   /* nothing behind the player to show through or scroll */
+  #chat{overscroll-behavior:contain}
+  #chatBtnP{display:none}   /* the floating chat button replaces it */
   h1{margin:8px 0 4px;font-size:26px}
   p.sub{margin:0 0 18px;color:var(--mute);font-size:14px}
   .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px}
@@ -46,9 +49,9 @@
   #cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;text-shadow:0 0 20px #000;pointer-events:none}
   #ui{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));background:linear-gradient(#000a,#0000 25%,#0000 65%,#000c)}
   #ui.hide{opacity:0;pointer-events:none}
-  .top,.bot{display:flex;align-items:center;gap:10px}
+  .top,.bot{display:flex;align-items:center;gap:6px}
   .top .t{flex:1;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .chip{background:#000a;border-radius:20px;padding:8px 12px;font-size:13px;width:auto}
+  .chip{background:#000a;border-radius:20px;padding:8px 10px;font-size:13px;width:auto}
   .mid{display:flex;justify-content:center;align-items:center;gap:28px}
   .rb{width:64px;height:64px;border-radius:50%;background:#000a;color:#fff;font-size:15px;padding:0}
   .rb.big{width:84px;height:84px;font-size:34px;background:var(--accent);color:#06140c}
@@ -206,7 +209,7 @@
 </div>
 
 <div id="plist"></div>
-<div id="brBox"><div style="display:flex;align-items:center;gap:10px"><span>🔅</span><input type="range" id="brRange" min="50" max="220" value="100" style="flex:1"><span>🔆</span></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px"><span id="brVal">100%</span><button class="sec" id="brReset" style="width:auto;padding:6px 14px;font-size:13px">Reset</button></div></div>
+<div id="brBox"><div style="display:flex;align-items:center;gap:10px"><span>🔅</span><input type="range" id="brRange" min="50" max="300" value="100" style="flex:1"><span>🔆</span></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px"><span id="brVal">100%</span><button class="sec" id="brReset" style="width:auto;padding:6px 14px;font-size:13px">Reset</button></div></div>
 
 <!-- CHAT (slides in from the right, over any screen) -->
 <button id="chatFab" aria-label="Chat">💬<span id="fabDot"></span></button>
@@ -523,7 +526,7 @@ $("ccBtn").onclick = () => {
 
 /* brightness: dims or brightens the picture (a web page cannot change the phone's own screen brightness) */
 function applyBr(v){
-  v = Math.max(50, Math.min(220, +v || 100));
+  v = Math.max(50, Math.min(300, +v || 100));
   const f = v === 100 ? "" : "brightness(" + (v / 100) + ")";
   $("vid").style.filter = f; $("rv").style.filter = f;
   $("brRange").value = v; $("brVal").textContent = v + "%";
